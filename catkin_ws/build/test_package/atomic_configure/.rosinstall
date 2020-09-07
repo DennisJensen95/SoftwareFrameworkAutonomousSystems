@@ -1,0 +1,2 @@
+- setup-file:
+    local-name: /home/dennis/GIT/SoftwareFrameworkAutonomousSystems/catkin_ws/devel/.private/test_package/setup.sh
