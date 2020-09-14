@@ -11,10 +11,4 @@
     name="teleop_key"
     required="true"
  />
- <node
- pkg="hello_ros"
- name="create_spiral"
- type="create_spiral.py"
- output="screen"
- />
 </launch>

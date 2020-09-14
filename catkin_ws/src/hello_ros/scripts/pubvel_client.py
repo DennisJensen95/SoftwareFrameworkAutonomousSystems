@@ -28,4 +28,4 @@ if __name__ == "__main__":
         print(usage())
         sys.exit(1)
     print("Requesting a relative telepot linear:%s, angular:%s" % (x, theta))
-    print("The execution is %s" % call_service(x, theta))
+    print("The execution is %s", call_service(x, theta))
