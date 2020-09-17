@@ -3,3 +3,4 @@ arm_controller:
   joints:
     - hip
     - shoulder
+    - elbow
