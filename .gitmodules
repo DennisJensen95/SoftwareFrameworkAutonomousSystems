@@ -1,0 +1,6 @@
+[submodule "catkin_ws/src/moveit_tutorials"]
+	path = catkin_ws/src/moveit_tutorials
+	url = https://github.com/ros-planning/moveit_tutorials.git
+[submodule "catkin_ws/src/panda_moveit_config"]
+	path = catkin_ws/src/panda_moveit_config
+	url = https://github.com/ros-planning/panda_moveit_config.git
