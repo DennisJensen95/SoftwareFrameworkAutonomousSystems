@@ -1,0 +1,11 @@
+moveit_setup_assistant_config:
+  URDF:
+    package: hello_ros
+    relative_path: urdf/hello_gazebo_robot_3.urdf
+    xacro_args: ""
+  SRDF:
+    relative_path: config/hello_ros_robot.srdf
+  CONFIG:
+    author_name: Dennis Jensen
+    author_email: s155629@student.dtu.dk
+    generated_timestamp: 1600695881
