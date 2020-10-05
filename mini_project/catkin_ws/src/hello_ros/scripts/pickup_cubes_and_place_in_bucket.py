@@ -65,7 +65,7 @@ def add_bucket_to_planning_scene(scene):
     p.pose.position.y = bucket_pose.y
     p.pose.position.z = bucket_pose.z + dist_from_origo_bucket_to_middle_bucket + 0.1
 
-    scene.add_box("bucket", p, (5*0.05, 5*0.05, 5*0.05))
+    scene.add_box("bucket", p, (7*0.05, 7*0.05, 7*0.05))
 
     return scene
 
