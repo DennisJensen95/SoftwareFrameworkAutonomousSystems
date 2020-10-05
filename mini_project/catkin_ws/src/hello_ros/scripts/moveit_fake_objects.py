@@ -109,7 +109,6 @@ def move_group_python_interface_tutorial():
     p.pose.position.y = 0.
     p.pose.position.z = -0.01
     scene.add_box("groundplane", p, (2, 2, 0.009))
-    print(scene.get_objects())
 
     # Planning to a Pose goal
     # ^^^^^^^^^^^^^^^^^^^^^^^

@@ -22,7 +22,7 @@ def jointStatesCallback(msg):
 
 
 def open_close_gripper(open=True):
-    rospy.init_node('gripper_publisher')
+    # rospy.init_node('gripper_publisher')
     # Setup subscriber
 
     # rospy.Subscriber("/joint_states", JointState, jointStatesCallback)
@@ -42,27 +42,34 @@ def open_close_gripper(open=True):
     # tmp_tuple=tuple([tmp] + list(currentJointState.position[1:]))
     currentJointState.position = tuple(
         list(currentJointState.position[:6]) + [tmp] + [tmp] + [tmp])
-    rate = rospy.Rate(10)  # 10hz
+    rate = rospy.Rate(2)  # 10hz
     for i in range(3):
         pub.publish(currentJointState)
         print 'Published!'
         rate.sleep()
 
-    print 'Closed the gripper'
+    if open:
+        print 'Opened the gripper'
+    else:
+        print 'Closed the gripper'
 
 
 def move_gripper_to_pose(pose, group, orientation):
     pose_goal = group.get_current_pose().pose
-
+    waypoints = []
+    waypoints.append(pose_goal)
     pose_goal.position.x = pose.x
     pose_goal.position.y = pose.y
-    pose_goal.position.z = pose.z - 0.10
+    pose_goal.position.z = pose.z + 0.20
+    print("Moving to (x,y,z) ", pose.x, pose.y, pose.z)
 
-    # pose_goal.orientation = orientation
-
+    pose_goal.orientation = orientation
+    waypoints.append(pose_goal)
     (plan, _) = group.compute_cartesian_path(
-        [pose_goal],   # Only one waypoint
+        waypoints,   # Only one waypoint
         0.01,        # eef_step
-        0.0, True)
+        0.0, avoid_collisions=True)
 
     group.execute(plan, wait=True)
+
+    rospy.sleep(4)
