@@ -93,7 +93,8 @@ def main_pickup():
     robot = moveit_commander.RobotCommander()
     scene = moveit_commander.PlanningSceneInterface()
     group = moveit_commander.MoveGroupCommander("Arm")
-    group.compute_cartesian_path
+
+    group.allow_replanning(True)
 
     print "============ Reference frame: %s" % group.get_planning_frame()
 
@@ -107,52 +108,65 @@ def main_pickup():
     group.set_goal_orientation_tolerance(0.2)
     group.set_goal_tolerance(0.1)
     group.set_goal_joint_tolerance(0.1)
-    group.set_planning_time(5)
+    group.set_planning_time(20)
 
     # Let subscriber populate position cubes
     rospy.sleep(5)
 
     # Adding cubes to the scene
-    scene = add_cubes_to_planning_scene(scene)
+    # scene = add_cubes_to_planning_scene(scene)
     scene = add_bucket_to_planning_scene(scene)
 
     start_pos = group.get_current_pose().pose
     # Loop cubes
-    for key in positions_cubes.keys():
-        if cube_in_bucket_state(key):
-            print "Cube is in the bucket:", key
-            continue
+    num_try = 0
+    while (True):
+        if num_try >= 3:
+            break
         else:
-            print "Cube is not in the bucket:", key
+            num_try += 1
 
-        print("Grabbing cube: ", key)
-        # Open gripper
-        open_close_gripper(open=True)
-        rospy.sleep(3)
+        for key in positions_cubes.keys():
+            if cube_in_bucket_state(key):
+                print "Cube is in the bucket:", key
+                continue
+            else:
+                print "Cube is not in the bucket:", key
 
-        # Move gripper to be above cube by 10 cm
-        move_to_pose = positions_cubes[key]
-        move_to_pose.z = move_to_pose.z + 0.1
-        move_gripper_to_pose(move_to_pose, group, downward_orientation)
-        rospy.sleep(3)
+            print("Grabbing cube: ", key)
+            # Open gripper
+            open_close_gripper(open=True)
+            rospy.sleep(3)
 
-        # Move gripper to be with grabbing range of the cube
-        move_gripper_to_pose(positions_cubes[key], group, downward_orientation)
-        rospy.sleep(3)
+            # Move gripper to be above cube by 10 cm
+            move_to_pose = positions_cubes[key]
+            move_to_pose.z = move_to_pose.z + 0.1
+            state = move_gripper_to_pose(
+                move_to_pose, group, downward_orientation)
+            print(state)
+            rospy.sleep(3)
 
-        # Close the gripper
-        open_close_gripper(open=False)
-        rospy.sleep(3)
+            # Move gripper to be with grabbing range of the cube
+            state = move_gripper_to_pose(
+                positions_cubes[key], group, downward_orientation)
+            print(state)
+            rospy.sleep(3)
 
-        # Move to bucket
-        move_to_bucket = bucket_pose
-        move_to_bucket.z = move_to_bucket.z + 0.20
-        move_gripper_to_pose(move_to_bucket, group, downward_orientation)
-        rospy.sleep(3)
+            # Close the gripper
+            open_close_gripper(open=False)
+            rospy.sleep(3)
 
-        # Throw cube in bucket
-        open_close_gripper(open=True)
-        rospy.sleep(3)
+            # Move to bucket
+            move_to_bucket = bucket_pose
+            move_to_bucket.z = move_to_bucket.z + 0.30
+            state = move_gripper_to_pose(
+                move_to_bucket, group, downward_orientation)
+            print(state)
+            rospy.sleep(3)
+
+            # Throw cube in bucket
+            open_close_gripper(open=True)
+            rospy.sleep(3)
 
     # Back to starting position
     move_gripper_to_pose(start_pos.position, group, start_pos.orientation)

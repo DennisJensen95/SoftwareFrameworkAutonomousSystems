@@ -60,16 +60,18 @@ def move_gripper_to_pose(pose, group, orientation):
     waypoints.append(pose_goal)
     pose_goal.position.x = pose.x
     pose_goal.position.y = pose.y
-    pose_goal.position.z = pose.z + 0.20
+    pose_goal.position.z = pose.z + 0.19
     print("Moving to (x,y,z) ", pose.x, pose.y, pose.z)
 
     pose_goal.orientation = orientation
     waypoints.append(pose_goal)
     (plan, _) = group.compute_cartesian_path(
         waypoints,   # Only one waypoint
-        0.01,        # eef_step
+        0.001,        # eef_step
         0.0, avoid_collisions=True)
 
-    group.execute(plan, wait=True)
+    success = group.execute(plan, wait=True)
 
     rospy.sleep(4)
+
+    return success
