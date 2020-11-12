@@ -63,9 +63,9 @@ def add_bucket_to_planning_scene(scene):
     p = geometry_msgs.msg.PoseStamped()
     p.pose.position.x = bucket_pose.x
     p.pose.position.y = bucket_pose.y
-    p.pose.position.z = bucket_pose.z + dist_from_origo_bucket_to_middle_bucket + 0.1
+    p.pose.position.z = bucket_pose.z
 
-    scene.add_box("bucket", p, (7*0.05, 7*0.05, 7*0.05))
+    scene.add_box("bucket", p, (8*0.05, 8*0.05, 8*0.05))
 
     return scene
 
