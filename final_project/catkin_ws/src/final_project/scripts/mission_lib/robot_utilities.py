@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 import rospy
 from nav_msgs.msg import Odometry
+import threading
 
 
-class QrCodeUtility():
+class BurgerUtility():
     """
         Robot Utility box specialized for final project in Software Autonomous systems     
     """
@@ -18,10 +19,13 @@ class QrCodeUtility():
         rospy.Subscriber("/odom",
                          Odometry, self.callback_robot_pose)
 
-        rospy.spin()
+        self.main_thread = threading.Thread(target=self.main).start()
 
-    def callback_qr_code_message(self, payload):
+    def callback_robot_pose(self, payload):
         self.robot_pos = payload
+
+    def main(self):
+        rospy.spin()
 
     def get_robot_x_y_position(self):
         if self.robot_pos != None:
