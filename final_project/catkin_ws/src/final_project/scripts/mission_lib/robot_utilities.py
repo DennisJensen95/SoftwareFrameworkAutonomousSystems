@@ -5,6 +5,8 @@ import actionlib
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import LaserScan
+from tf.transformations import euler_from_quaternion
+import math
 
 
 class BurgerUtility():
@@ -16,6 +18,7 @@ class BurgerUtility():
         """
             Initialize Robot Class
         """
+        self.log_tag = "[Robot Utilities]:"
 
         # QR code utilities
         self.qr_code_util = QrCodeUtil
@@ -27,7 +30,7 @@ class BurgerUtility():
 
         # Laser scanner
         self.g_range_ahead = 1
-        scan_sub = rospy.Subscriber('scan', LaserScan, self.callback_scan)
+        rospy.Subscriber('scan', LaserScan, self.callback_scan)
 
         # Robot movement #
         # Desired position movement
@@ -51,6 +54,9 @@ class BurgerUtility():
             tmp.append(msg.ranges[i])
             self.g_range_ahead = min(tmp)
 
+    def log(self, msg):
+        print(self.log_tag + msg)
+
     def get_robot_x_y_position(self):
         if self.robot_pos != None:
             return (self.robot_pos.pose.pose.position.x, self.robot_pos.pose.pose.position.y, self.robot_pos.pose.pose.position.z)
@@ -59,7 +65,7 @@ class BurgerUtility():
 
     def goal_pose(self, pose):
         goal_pose = MoveBaseGoal()
-        goal_pose.target_pose.header.frame_id = 'odom'
+        goal_pose.target_pose.header.frame_id = "odom"
         goal_pose.target_pose.pose.position.x = pose.position.x
         goal_pose.target_pose.pose.position.y = pose.position.y
         goal_pose.target_pose.pose.position.z = pose.position.z
@@ -73,7 +79,7 @@ class BurgerUtility():
     def move_to_pose(self, pose):
         goal = self.goal_pose(pose)
         self.burger.send_goal(goal)
-        self.burger.wait_for_result()
+        self.log(str(self.burger.wait_for_result()))
 
         x_desired = pose.position.x
         y_desired = pose.position.y
@@ -89,11 +95,32 @@ class BurgerUtility():
         else:
             return False
 
+    def aquire_frame_transformations(self):
+        self.log("Sleeping to get transform frames")
+        rospy.sleep(1)
+        return True
+
+    def get_desired_position_on_qr_code(self, orig_pose, diff_pose, dist_from=0):
+        quaternion = (orig_pose.pose.orientation.x, orig_pose.pose.orientation.y,
+                      orig_pose.pose.orientation.z, orig_pose.pose.orientation.w)
+        (_, _, heading) = euler_from_quaternion(quaternion)
+        self.log("Heading is:" + str(heading))
+        desired_pose = orig_pose
+        desired_pose.pose.position.x = orig_pose.pose.position.x + \
+            diff_pose.pose.position.x + \
+            math.cos(heading) * (diff_pose.pose.position.z - dist_from)
+        desired_pose.pose.position.y = orig_pose.pose.position.y + \
+            diff_pose.pose.position.y + \
+            math.sin(heading) * (diff_pose.pose.position.z - dist_from)
+
+        return desired_pose
+
     def find_qr_code(self):
         """
         Description of function here
         """
-        print("Searching for QR code")
+
+        self.log("Searching for QR code")
         while not rospy.is_shutdown():
             if self.g_range_ahead < 0.8:
                 # TURN

@@ -16,6 +16,8 @@ class QrCodeUtility():
             Initialize QrCodeUtility Class
         """
 
+        self.log_tag = "[QR Code Utility]:"
+
         # QR code message
         self.qr_code_message = ""
         self.qr_code_detected = False
@@ -44,6 +46,9 @@ class QrCodeUtility():
         else:
             self.qr_code_detected = False
 
+    def log(self, msg):
+        print(self.log_tag + msg)
+
     def is_qr_code_detected(self):
         return self.qr_code_detected
 
@@ -51,11 +56,11 @@ class QrCodeUtility():
         if self.qr_code_detected:
             self.qr_code_position = payload
 
-    def transform_pose_from_map_to_odom(self, pose):
+    def transform_pose_in_frames(self, pose, target_frame, current_frame):
         now = rospy.Time.now()
         self.tf_listener.waitForTransform(
-            '/odom', '/map', now, rospy.Duration(4.0))
-        pose_odo_frame = self.tf_listener.transformPose("/odom", pose)
+            target_frame, current_frame, now, rospy.Duration(4.0))
+        pose_odo_frame = self.tf_listener.transformPose(target_frame, pose)
 
         return pose_odo_frame
 
@@ -69,8 +74,8 @@ class QrCodeUtility():
                 rot_tuple = (rotation.x, rotation.y, rotation.z, rotation.w)
                 translation = self.pose_diff_hidden_frame_to_odom.position
                 trans_tuple = (translation.x, translation.y, translation.z)
-                print("Translation is: %s", str(trans_tuple))
-                print("Rotation is: %s", str(rot_tuple))
+                self.log("Translation is: %s", str(trans_tuple))
+                self.log("Rotation is: %s", str(rot_tuple))
                 br.sendTransform(trans_tuple, rot_tuple,
                                  rospy.Time.now(), "hidden_frame", "odom")
                 rate.sleep()
