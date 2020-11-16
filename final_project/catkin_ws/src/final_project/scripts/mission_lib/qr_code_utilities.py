@@ -7,7 +7,7 @@ import threading
 import re
 import numpy as np
 from kabsch import rigid_transform_3D
-from tf.transformations import quaternion_from_matrix
+from tf.transformations import quaternion_from_matrix, rotation_matrix
 
 
 class QrCodeUtility():
@@ -49,7 +49,7 @@ class QrCodeUtility():
 
     def callback_qr_code_message(self, payload):
         """[summary]
-        Check if code message of QR code is present - if so QR code detected and 
+        Check if code message of QR code is present - if so QR code detected and
         class state variable is True else False
         Args:
             payload ([str]): [QR code message]
@@ -77,7 +77,7 @@ class QrCodeUtility():
         next_qr = self.get_saved_next_qr_code_x_y()
         current_qr = self.get_saved_qr_code_x_y()
         N = re.findall("N=(\d+)", self.saved_code_message)[0]
-        L = re.findall("L=([A-Z]+)", self.saved_code_message)[0]
+        L = re.findall("L=(\w+)", self.saved_code_message)[0]
         data_object = self.qr_codes_data_object(
             N, L, current_qr, next_qr, qr_code_pos_odom)
         self.qr_messages_position.update(data_object)
@@ -95,6 +95,9 @@ class QrCodeUtility():
     def get_current_N_code(self):
         N = re.findall("N=(\d+)", self.qr_code_message)[0]
         return N
+
+    def get_number_of_qr_codes(self):
+        return len(self.return_found_qr_codes())
 
     def return_found_qr_codes(self):
         N_found = []
@@ -214,21 +217,25 @@ class QrCodeUtility():
 
         A = []
         B = []
-        # for key in self.qr_messages_position.keys():
-        # data = self.qr_messages_position[key]
-        # A.append([data["pos"][0], data["pos"][1], 0])
-        # B.append([data["odom_pos"].x, data["odom_pos"].y, 0])
+        for key in self.qr_messages_position.keys():
+            data = self.qr_messages_position[key]
+            A.append([data["pos"][0], data["pos"][1], 0])
+            B.append([data["odom_pos"].x, data["odom_pos"].y, 0])
 
-        A = [[3.03, 1.15, 0],
-             [2.67, 3.23, 0]]
-        B = [[-4.833, 2.895, 0],
-             [-6.28, 2.65, 0]]
         A = np.transpose(np.array(A))
         B = np.transpose(np.array(B))
-        self.log(str(A.shape))
         (R, t) = rigid_transform_3D(A, B)
+        R = np.array(R)
+        R = np.append(R, np.array([[0, 0, 0]]), axis=0)
+        R = np.append(R, np.array([[0], [0], [0], [1]]), axis=1)
+        t = t[:, 0]
 
-        print(R)
         quaternion_change = quaternion_from_matrix(R)
-        translation_change = t
-        print(np.size(t))
+        self.pose_diff_hidden_frame_to_odom = Pose()
+        self.pose_diff_hidden_frame_to_odom.position.x = t[0]
+        self.pose_diff_hidden_frame_to_odom.position.y = t[1]
+        self.pose_diff_hidden_frame_to_odom.position.z = t[2]
+        self.pose_diff_hidden_frame_to_odom.orientation.x = quaternion_change[0]
+        self.pose_diff_hidden_frame_to_odom.orientation.y = quaternion_change[1]
+        self.pose_diff_hidden_frame_to_odom.orientation.z = quaternion_change[2]
+        self.pose_diff_hidden_frame_to_odom.orientation.w = quaternion_change[3]

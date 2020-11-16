@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from time import sleep
 import rospy
 from nav_msgs.msg import Odometry
 import actionlib
@@ -114,7 +115,7 @@ class BurgerUtility():
 
         return goal_pose
 
-    def move_to_pose(self, pose, duration=rospy.Duration()):
+    def move_to_pose(self, pose, duration=rospy.Duration(40)):
         """[summary]
         Will move the robot to a desired pose
         Args:
@@ -161,6 +162,7 @@ class BurgerUtility():
         Returns:
             [PoseStamped]: [Position of QR code and coordinate frame]
         """
+        sleep(1)
         start = time.time()
         position_x = []
         position_y = []
@@ -258,6 +260,26 @@ class BurgerUtility():
 
         self.cmd_vel_pub.publish(twist)
 
+    def turn_around(self):
+        twist = Twist()
+        twist.linear.x = 0.0
+        twist.angular.z = 0.4
+
+        self.cmd_vel_pub.publish(twist)
+
+    def find_qr_code_turn_around(self, new=True):
+        self.log("Searching for QR code")
+        start = time.time()
+        duration = 10
+        while not rospy.is_shutdown():
+
+            self.turn_around()
+            if self.check_if_qr_code(new):
+                break
+
+            if (time.time() - start >= duration):
+                break
+
     def transform_qr_code_to_desired_pos(self, qr_code_pos, dist_from, tries=2):
         """[summary]
         Transform QR code position in /MAP frame to /ODOM frame
@@ -313,6 +335,20 @@ class BurgerUtility():
 
         return goal_pose
 
+    def check_if_qr_code(self, new):
+        if self.qr_code_util.is_qr_code_detected() and self.qr_code_util.qr_code_position != None:
+            if new and not self.qr_code_util.is_new_qr_code():
+                self.log("Not new qr code")
+                return False
+
+            twist = Twist()
+            twist.linear.x = 0
+            twist.angular.z = 0
+            self.cmd_vel_pub.publish(twist)
+            return True
+
+        return False
+
     def find_qr_code(self, new=False):
         """
         Description of function here
@@ -322,29 +358,17 @@ class BurgerUtility():
         while not rospy.is_shutdown():
 
             self.drive_random()
-
-            if self.qr_code_util.is_qr_code_detected() and self.qr_code_util.qr_code_position != None:
-                if new and not self.qr_code_util.is_new_qr_code():
-                    self.log("Not new qr code")
-                    continue
-
-                twist = Twist()
-                twist.linear.x = 0
-                twist.angular.z = 0
-                self.cmd_vel_pub.publish(twist)
+            if self.check_if_qr_code(new):
                 break
 
-    def drive_to_next_qr_code(self):
+    def drive_to_next_qr_code(self, next_x_y):
         """[summary]
         Drive to the next QR code from the last 
         """
-        print("Checking trans")
         check_pos = PoseStamped()
         check_pos.header.frame_id = "hidden_frame"
-        check_pos.pose.position.x = self.qr_code_util.get_saved_next_qr_code_x_y()[
-            0]
-        check_pos.pose.position.y = self.qr_code_util.get_saved_next_qr_code_x_y()[
-            1]
+        check_pos.pose.position.x = next_x_y[0]
+        check_pos.pose.position.y = next_x_y[1]
         check_pos.pose.orientation.x = 0
         check_pos.pose.orientation.y = 0
         check_pos.pose.orientation.z = 0
@@ -352,7 +376,6 @@ class BurgerUtility():
         self.log("Going to new QR code")
         desired_pose = self.qr_code_util.transform_pose_in_frames(
             check_pos, "odom", "hidden_frame").pose
-        self.log(str(desired_pose))
 
         self.move_to_pose(desired_pose)
 
