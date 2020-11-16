@@ -2,7 +2,6 @@
 import rospy
 from mission_lib.robot_utilities import BurgerUtility
 from mission_lib.qr_code_utilities import QrCodeUtility
-from geometry_msgs.msg import PoseStamped
 
 
 def main():
@@ -12,31 +11,30 @@ def main():
     qr_code_util = QrCodeUtility()
     burger = BurgerUtility(qr_code_util)
 
+    # Find QR Code
     burger.find_qr_code()
+
+    # QR Code is found now estimate position
     qr_code_pos = burger.read_qr_code(duration=2)
-    burger.drive_to_qr_code(qr_code_pos)
+
+    # Drive to the QR code with a distance of 80 centimeters from QR code
+    burger.drive_to_qr_code(qr_code_pos, dist_from=0.8)
+
+    # Read the QR code again to get the best estimation of the position
     qr_code_pos = burger.read_qr_code(duration=2)
-    # print(qr_code_pos)
+
+    # Save the code message
+    qr_code_util.save_code_message()
+
+    # Transform the QR code position from /map to /odometry and in global /odemtry frame
     qr_code_pos = burger.transform_qr_code_to_desired_pos(
         qr_code_pos, dist_from=0)
-    # print(qr_code_pos)
+
+    # Create the transform from /odom frame to /hidden_frame
     qr_code_util.create_transform_from_odom_to_hidden_frame(qr_code_pos)
 
-    print("Checking trans")
-    check_pos = PoseStamped()
-    check_pos.header.frame_id = "hidden_frame"
-    check_pos.pose.position.x = qr_code_util.get_next_qr_code_x_y()[0]
-    check_pos.pose.position.y = qr_code_util.get_next_qr_code_x_y()[1]
-    check_pos.pose.orientation.x = 0
-    check_pos.pose.orientation.y = 0
-    check_pos.pose.orientation.z = 0
-    check_pos.pose.orientation.w = 1
-    print("Going to new QR code")
-    desired_pose = qr_code_util.transform_pose_in_frames(
-        check_pos, "odom", "hidden_frame").pose
-
-    # print(desired_pose)
-    burger.move_to_pose(desired_pose)
+    # From last saved QR code message drive to it from the new transformation frame
+    burger.drive_to_next_qr_code()
 
     rospy.signal_shutdown("Mission done")
 

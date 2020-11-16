@@ -1,10 +1,9 @@
 #!/usr/bin/env python
-from numpy.lib.function_base import diff
 import rospy
 from nav_msgs.msg import Odometry
 import actionlib
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
-from geometry_msgs.msg import Twist, Pose
+from geometry_msgs.msg import Twist, Pose, PoseStamped
 from sensor_msgs.msg import LaserScan
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
 import math
@@ -13,8 +12,8 @@ import numpy as np
 
 
 class BurgerUtility():
-    """
-        Robot Utility box specialized for final project in Software Autonomous systems
+    """[summary]
+    Class for utilities in moving the robot 
     """
 
     def __init__(self, QrCodeUtil):
@@ -47,9 +46,19 @@ class BurgerUtility():
         self.driving_forward = True
 
     def callback_robot_pose(self, payload):
+        """[summary]
+        Callback on robot position in odometry. Save to class variable
+        Args:
+            payload ([Odemtry]): [Odemtry object]
+        """
         self.robot_pos = payload
 
     def callback_scan(self, msg):
+        """[summary]
+        Callback on message received on topic /scan to save results
+        Args:
+            msg ([LaserScan]): [LaserScan data object]
+        """
         tmp = [msg.ranges[0]]
         for i in range(1, 21):
             tmp.append(msg.ranges[i])
@@ -58,18 +67,41 @@ class BurgerUtility():
             self.g_range_ahead = min(tmp)
 
     def log(self, msg):
+        """[summary]
+        Default logging
+        Args:
+            msg ([str]): [Message wanted to be logged]
+        """
         print(self.log_tag + msg)
 
     def get_robot_x_y_position(self):
+        """[summary]
+        Get current x and y position of robot in Odometry frame
+        Returns:
+            [tuple]: [Position]
+        """
         if self.robot_pos != None:
             return (self.robot_pos.pose.pose.position.x, self.robot_pos.pose.pose.position.y, self.robot_pos.pose.pose.position.z)
         else:
             return None
 
     def get_robot_pose(self):
+        """[summary]
+        Return the current known positon of the robot in odometry coordinates
+        Returns:
+            [Pose]: [Odemetry coordinates]
+        """
         return self.robot_pos.pose.pose
 
     def goal_pose(self, pose):
+        """[summary]
+        Transform pose to a Object MovebaseGoal
+        Args:
+            pose ([Pose]): [goal position]
+
+        Returns:
+            [MovebaseGoal]: [MoveBaseGoal object in desired position]
+        """
         goal_pose = MoveBaseGoal()
         goal_pose.target_pose.header.frame_id = "odom"
         goal_pose.target_pose.pose.position.x = pose.position.x
@@ -83,9 +115,18 @@ class BurgerUtility():
         return goal_pose
 
     def move_to_pose(self, pose, duration=rospy.Duration()):
+        """[summary]
+        Will move the robot to a desired pose
+        Args:
+            pose ([Pose]): [Position of desired pose]
+            duration ([rospy.duration()], optional): [How long it should try to reach goal position]. Defaults to Infinity.
+
+        Returns:
+            [Bool]: [Success]
+        """
         goal = self.goal_pose(pose)
         self.burger.send_goal(goal)
-        self.log(str(self.burger.wait_for_result(duration)))
+        self.burger.wait_for_result(duration)
 
         x_desired = pose.position.x
         y_desired = pose.position.y
@@ -102,11 +143,24 @@ class BurgerUtility():
             return False
 
     def aquire_frame_transformations(self):
+        """[summary]
+        If transform buffer is not filled, try waiting and getting it again.
+        Returns:
+            [Bool]: [State]
+        """
         self.log("Sleeping to get transform frames")
         rospy.sleep(1)
         return True
 
     def read_qr_code(self, duration):
+        """[summary]
+        Will read the QR code position for a specific duration accumulating and averaging results
+        Args:
+            duration ([int]): [How long to analyze QR code]
+
+        Returns:
+            [PoseStamped]: [Position of QR code and coordinate frame]
+        """
         start = time.time()
         position_x = []
         position_y = []
@@ -137,6 +191,16 @@ class BurgerUtility():
         return qr_code
 
     def get_desired_position_on_qr_code(self, orig_pose, diff_pose, dist_from=0):
+        """[summary]
+        Get position of QR code relative to the robots current pose
+        Args:
+            orig_pose ([Pose]): [Robots position]
+            diff_pose ([Pose]): [Relative translation position]
+            dist_from (int, optional): [Distance from the relative position change you]. Defaults to 0.
+
+        Returns:
+            [Pose]: [Desired pose object]
+        """
         quaternion_robot = (orig_pose.pose.orientation.x, orig_pose.pose.orientation.y,
                             orig_pose.pose.orientation.z, orig_pose.pose.orientation.w)
         quaternion_qr = (diff_pose.pose.orientation.x, diff_pose.pose.orientation.y,
@@ -173,6 +237,10 @@ class BurgerUtility():
         return desired_pose
 
     def drive_random(self):
+        """[summary]
+        Drive randomly and avoid obstacle collision
+        """
+
         if self.g_range_ahead < 0.8:
             # TURN
             driving_forward = False
@@ -190,12 +258,24 @@ class BurgerUtility():
 
         self.cmd_vel_pub.publish(twist)
 
-    def transform_qr_code_to_desired_pos(self, qr_code_pos, dist_from):
-        for i in range(2):
+    def transform_qr_code_to_desired_pos(self, qr_code_pos, dist_from, tries=2):
+        """[summary]
+        Transform QR code position in /MAP frame to /ODOM frame
+
+        Args:
+            qr_code_pos ([PoseStamp]): [QR code position in /map frame]
+            dist_from ([float]): [Distance to get coordinate from object]
+            tries (int, optional): [Tries to transform coordinates]. Defaults to 2.
+
+        Returns:
+            [bool]: [Success]
+        """
+        for i in range(tries):
             try:
                 qr_code_pos_odom_frame = self.qr_code_util.transform_pose_in_frames(
                     qr_code_pos, '/odom', '/map')
 
+                # Internal class component updating robot position
                 robot_pose = self.robot_pos.pose
 
                 desired_pose = self.get_desired_position_on_qr_code(
@@ -208,30 +288,21 @@ class BurgerUtility():
 
         return False
 
-    def drive_to_qr_code(self, qr_code_pos):
+    def drive_to_qr_code(self, qr_code_pos, dist_from=0.8):
+        qr_code_pos = self.transform_qr_code_to_desired_pos(
+            qr_code_pos, dist_from=dist_from)
 
-        while True:
-            previous_pose = self.get_robot_pose()
-            qr_code_pos = self.transform_qr_code_to_desired_pos(
-                qr_code_pos, dist_from=1.2)
+        if isinstance(qr_code_pos, bool):
+            return False
 
-            if isinstance(qr_code_pos, bool):
-                return False
+        goal_pose = self.get_goal_pose(qr_code_pos)
+        self.log("Move to goal_pose:" + str(goal_pose))
+        if self.move_to_pose(goal_pose, rospy.Duration()):
+            self.log("Succesfull moved to target position")
+            self.qr_code_util.save_code_message()
+            return True
 
-            goal_pose = self.get_goal_pose(qr_code_pos)
-            self.log("Move to goal_pose:" + str(goal_pose))
-            if self.move_to_pose(goal_pose, rospy.Duration(5)):
-                self.log("Succesfull moved to target position")
-                self.qr_code_util.save_code_message()
-                return True
-
-            self.burger.cancel_all_goals()
-            if not self.qr_code_util.is_qr_code_detected():
-                if not self.move_to_pose(previous_pose, rospy.Duration()):
-                    self.log("Failed to drive to QR code")
-                    return False
-
-            qr_code_pos = self.read_qr_code(duration=0.5)
+        return False
 
     def get_goal_pose(self, desired_pose):
         goal_pose = Pose()
@@ -258,3 +329,53 @@ class BurgerUtility():
                 twist.angular.z = 0
                 self.cmd_vel_pub.publish(twist)
                 break
+
+    def drive_to_next_qr_code(self):
+        """[summary]
+        Drive to the next QR code from the last 
+        """
+        print("Checking trans")
+        check_pos = PoseStamped()
+        check_pos.header.frame_id = "hidden_frame"
+        check_pos.pose.position.x = self.qr_code_util.get_saved_next_qr_code_x_y()[
+            0]
+        check_pos.pose.position.y = self.qr_code_util.get_saved_next_qr_code_x_y()[
+            1]
+        check_pos.pose.orientation.x = 0
+        check_pos.pose.orientation.y = 0
+        check_pos.pose.orientation.z = 0
+        check_pos.pose.orientation.w = 1
+        self.log("Going to new QR code")
+        desired_pose = self.qr_code_util.transform_pose_in_frames(
+            check_pos, "odom", "hidden_frame").pose
+        self.log(str(desired_pose))
+
+        self.move_to_pose(desired_pose)
+
+        return True
+
+    # Deprecated
+    def drive_to_qr_code_step(self, qr_code_pos):
+
+        while True:
+            previous_pose = self.get_robot_pose()
+            qr_code_pos = self.transform_qr_code_to_desired_pos(
+                qr_code_pos, dist_from=0.8)
+
+            if isinstance(qr_code_pos, bool):
+                return False
+
+            goal_pose = self.get_goal_pose(qr_code_pos)
+            self.log("Move to goal_pose:" + str(goal_pose))
+            if self.move_to_pose(goal_pose, rospy.Duration()):
+                self.log("Succesfull moved to target position")
+                self.qr_code_util.save_code_message()
+                return True
+
+            self.burger.cancel_all_goals()
+            if not self.qr_code_util.is_qr_code_detected():
+                if not self.move_to_pose(previous_pose, rospy.Duration()):
+                    self.log("Failed to drive to QR code")
+                    return False
+
+            qr_code_pos = self.read_qr_code(duration=0.5)
