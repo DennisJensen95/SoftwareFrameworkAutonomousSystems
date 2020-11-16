@@ -299,7 +299,7 @@ class BurgerUtility():
         self.log("Move to goal_pose:" + str(goal_pose))
         if self.move_to_pose(goal_pose, rospy.Duration()):
             self.log("Succesfull moved to target position")
-            self.qr_code_util.save_code_message()
+            self.qr_code_util.save_code_message(qr_code_pos.pose.position)
             return True
 
         return False
@@ -313,7 +313,7 @@ class BurgerUtility():
 
         return goal_pose
 
-    def find_qr_code(self):
+    def find_qr_code(self, new=False):
         """
         Description of function here
         """
@@ -324,6 +324,10 @@ class BurgerUtility():
             self.drive_random()
 
             if self.qr_code_util.is_qr_code_detected() and self.qr_code_util.qr_code_position != None:
+                if new and not self.qr_code_util.is_new_qr_code():
+                    self.log("Not new qr code")
+                    continue
+
                 twist = Twist()
                 twist.linear.x = 0
                 twist.angular.z = 0

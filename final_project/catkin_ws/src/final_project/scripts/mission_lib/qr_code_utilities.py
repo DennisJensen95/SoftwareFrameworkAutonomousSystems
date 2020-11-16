@@ -5,6 +5,9 @@ from geometry_msgs.msg import Pose, PoseStamped
 import tf
 import threading
 import re
+import numpy as np
+from kabsch import rigid_transform_3D
+from tf.transformations import quaternion_from_matrix
 
 
 class QrCodeUtility():
@@ -23,6 +26,9 @@ class QrCodeUtility():
         self.saved_code_message = ""
         self.qr_code_message = ""
         self.qr_code_detected = False
+
+        # QR Messages position
+        self.qr_messages_position = {}
 
         # QR code position
         self.qr_code_position = None
@@ -63,11 +69,39 @@ class QrCodeUtility():
         if self.qr_code_detected:
             self.qr_code_position = payload
 
-    def save_code_message(self):
+    def save_code_message(self, qr_code_pos_odom):
         """[summary]
         Save a QR code message at a specific time and dont change before next save
         """
         self.saved_code_message = self.qr_code_message
+        next_qr = self.get_saved_next_qr_code_x_y()
+        current_qr = self.get_saved_qr_code_x_y()
+        N = re.findall("N=(\d+)", self.saved_code_message)[0]
+        L = re.findall("L=([A-Z]+)", self.saved_code_message)[0]
+        data_object = self.qr_codes_data_object(
+            N, L, current_qr, next_qr, qr_code_pos_odom)
+        self.qr_messages_position.update(data_object)
+
+    def qr_codes_data_object(self, N, L, pos_qr, next_pos_qr, odom_pos):
+        return {N: {"L": L, "pos": pos_qr, "next_pos": next_pos_qr, "odom_pos": odom_pos}}
+
+    def is_new_qr_code(self):
+        found_qr_codes = self.return_found_qr_codes()
+        N = self.get_current_N_code()
+        state = not (N in found_qr_codes)
+        self.log(str(state))
+        return state
+
+    def get_current_N_code(self):
+        N = re.findall("N=(\d+)", self.qr_code_message)[0]
+        return N
+
+    def return_found_qr_codes(self):
+        N_found = []
+        for key in self.qr_messages_position.keys():
+            N_found.append(key)
+
+        return N_found
 
     def get_qr_code_pose(self):
         """[summary]
@@ -171,22 +205,30 @@ class QrCodeUtility():
             if self.kill_broadcast_tf:
                 break
 
-    def create_transform_from_odom_to_hidden_frame(self, qr_code_position_odo):
+    def create_transform_from_odom_to_hidden_frame(self):
         """[summary]
         Create a transform for transforming from odometry frame to hidden frame
         Args:
             qr_code_position_odo ([Pose]): [QR code position in odemetry coordinates]
         """
-        qr_coordinates = self.get_saved_qr_code_x_y()
-        self.log(str(qr_code_position_odo))
-        self.log(str(qr_coordinates))
-        self.pose_diff_hidden_frame_to_odom = Pose()
-        self.pose_diff_hidden_frame_to_odom.position.x = qr_code_position_odo.pose.position.y + \
-            qr_coordinates[1]
-        self.pose_diff_hidden_frame_to_odom.position.y = qr_code_position_odo.pose.position.x + \
-            qr_coordinates[0]
 
-        self.pose_diff_hidden_frame_to_odom.orientation.x = 0
-        self.pose_diff_hidden_frame_to_odom.orientation.y = 0
-        self.pose_diff_hidden_frame_to_odom.orientation.z = 0
-        self.pose_diff_hidden_frame_to_odom.orientation.w = 1
+        A = []
+        B = []
+        # for key in self.qr_messages_position.keys():
+        # data = self.qr_messages_position[key]
+        # A.append([data["pos"][0], data["pos"][1], 0])
+        # B.append([data["odom_pos"].x, data["odom_pos"].y, 0])
+
+        A = [[3.03, 1.15, 0],
+             [2.67, 3.23, 0]]
+        B = [[-4.833, 2.895, 0],
+             [-6.28, 2.65, 0]]
+        A = np.transpose(np.array(A))
+        B = np.transpose(np.array(B))
+        self.log(str(A.shape))
+        (R, t) = rigid_transform_3D(A, B)
+
+        print(R)
+        quaternion_change = quaternion_from_matrix(R)
+        translation_change = t
+        print(np.size(t))
