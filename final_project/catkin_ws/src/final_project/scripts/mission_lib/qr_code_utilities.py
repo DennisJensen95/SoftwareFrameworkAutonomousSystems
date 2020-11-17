@@ -27,11 +27,15 @@ class QrCodeUtility():
         self.qr_code_message = ""
         self.qr_code_detected = False
 
+        # QR code resemblance X Y coordinate
+        self.margin_error_resemblance = 0.15
+
         # QR Messages position
         self.qr_messages_position = {}
 
         # QR code position
         self.qr_code_position = None
+        self.saved_qr_code_position = None
 
         # Initializing tf broadcaster
         self.tf_listener = tf.TransformListener()
@@ -73,23 +77,46 @@ class QrCodeUtility():
         """[summary]
         Save a QR code message at a specific time and dont change before next save
         """
-        self.saved_code_message = self.qr_code_message
-        next_qr = self.get_saved_next_qr_code_x_y()
-        current_qr = self.get_saved_qr_code_x_y()
-        N = re.findall("N=(\d+)", self.saved_code_message)[0]
-        L = re.findall("L=(\w+)", self.saved_code_message)[0]
-        data_object = self.qr_codes_data_object(
-            N, L, current_qr, next_qr, qr_code_pos_odom)
-        self.qr_messages_position.update(data_object)
+        if self.qr_code_message != "":
+            self.saved_code_message = self.qr_code_message
+            next_qr = self.get_saved_next_qr_code_x_y()
+            current_qr = self.get_saved_qr_code_x_y()
+            N = re.findall("N=(\d+)", self.saved_code_message)[0]
+            L = re.findall("L=(\w+)", self.saved_code_message)[0]
+            data_object = self.qr_codes_data_object(
+                N, L, current_qr, next_qr, qr_code_pos_odom)
+            self.qr_messages_position.update(data_object)
+
+            return True
+        
+        return False
+
+    def get_distance_to_saved_qr_code(self):
+        """[summary]
+        Return the distance to QR Code
+        """
+        return self.saved_qr_code_position.pose.position.z
 
     def qr_codes_data_object(self, N, L, pos_qr, next_pos_qr, odom_pos):
         return {N: {"L": L, "pos": pos_qr, "next_pos": next_pos_qr, "odom_pos": odom_pos}}
+
+    def qr_code_message_coordinates_matches(self, pose_x_y):
+        cur_x_y = self.get_saved_next_qr_code_x_y()
+        x_pos_state = (pose_x_y[0] + self.margin_error_resemblance >=
+                       cur_x_y[0] and pose_x_y[0] - self.margin_error_resemblance <= cur_x_y[0])
+        y_pos_state = (pose_x_y[1] + self.margin_error_resemblance >=
+                       cur_x_y[1] and pose_x_y[1] - self.margin_error_resemblance <= cur_x_y[1])
+        
+        # Check if the qr code read is the same as desired
+        if x_pos_state and y_pos_state:
+            return True
+        else:
+            return False
 
     def is_new_qr_code(self):
         found_qr_codes = self.return_found_qr_codes()
         N = self.get_current_N_code()
         state = not (N in found_qr_codes)
-        self.log(str(state))
         return state
 
     def get_current_N_code(self):
@@ -164,6 +191,19 @@ class QrCodeUtility():
             [bool]: [State detection]
         """
         return self.qr_code_detected
+    
+    def save_qr_code_position(self):
+        """[summary]
+        Save the current estimated QR code position
+        """
+        self.saved_qr_code_position = self.qr_code_position
+
+    def print_saved_qr_codes(self):
+        
+        for i in range(5):
+            key = str(i+1)
+            if key in self.qr_messages_position:
+                self.log(str(self.qr_messages_position[key]))
 
     def transform_pose_in_frames(self, pose, target_frame, current_frame):
         """[summary]
