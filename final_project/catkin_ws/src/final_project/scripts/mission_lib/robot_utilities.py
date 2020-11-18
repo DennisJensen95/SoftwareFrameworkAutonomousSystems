@@ -5,6 +5,7 @@ from nav_msgs.msg import Odometry
 import actionlib
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 from geometry_msgs.msg import Twist, Pose, PoseStamped
+from sensor_msgs.msg import Imu
 from sensor_msgs.msg import LaserScan
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
 import math
@@ -29,8 +30,10 @@ class BurgerUtility():
         # Robot position
         self.robot_pos = None
         self.saved_robot_pos = None
+        self.robot_imu_pos = None
         rospy.Subscriber("/odom",
                          Odometry, self.callback_robot_pose)
+        rospy.Subscriber("/imu", Imu, self.callback_robot_imu)
 
         # Laser scanner
         self.g_range_ahead = 1
@@ -68,6 +71,9 @@ class BurgerUtility():
         for i in range(len(msg.ranges)-21, len(msg.ranges)):
             tmp.append(msg.ranges[i])
             self.g_range_ahead = min(tmp)
+
+    def callback_robot_imu(self, payload):
+        self.robot_imu_pos = payload
 
     def log(self, msg):
         """[summary]
@@ -153,7 +159,7 @@ class BurgerUtility():
             # If the robot is in the desired position
             if self.burger.wait_for_result(rospy.Duration(0.3)):
                 return False
-                
+
             elif stop_before_any and self.check_if_qr_code(new=True):
                 self.log("Found an abritary QR code")
                 return True
@@ -212,52 +218,6 @@ class BurgerUtility():
 
         return qr_code
 
-    def get_desired_position_on_qr_code(self, orig_pose, diff_pose, dist_from=0):
-        """[summary]
-        Get position of QR code relative to the robots current pose
-        Args:
-            orig_pose ([Pose]): [Robots position]
-            diff_pose ([Pose]): [Relative translation position]
-            dist_from (int, optional): [Distance from the relative position change you]. Defaults to 0.
-
-        Returns:
-            [Pose]: [Desired pose object]
-        """
-        quaternion_robot = (orig_pose.pose.orientation.x, orig_pose.pose.orientation.y,
-                            orig_pose.pose.orientation.z, orig_pose.pose.orientation.w)
-        quaternion_qr = (diff_pose.pose.orientation.x, diff_pose.pose.orientation.y,
-                         diff_pose.pose.orientation.z, diff_pose.pose.orientation.w)
-        (roll_robot, pitch_robot, heading_robot) = euler_from_quaternion(
-            quaternion_robot)
-        (roll_qr, pitch_qr, heading_qr) = euler_from_quaternion(quaternion_qr)
-
-        # angle_between_qr_and_robot = heading_robot + (math.pi - roll_qr)
-
-        quaternion_desired = quaternion_from_euler(
-            roll_robot, pitch_robot, heading_robot)
-
-        # self.log("QR roll:" + str(roll_qr*180/math.pi))
-        # self.log("QR pitch: " + str(pitch_qr*180/math.pi))
-        # self.log("QR Heading: " + str(heading_qr*180/math.pi))
-        # self.log("Heading is:" + str(heading_robot*180/math.pi))
-        desired_pose = orig_pose
-        desired_pose.pose.position.x = orig_pose.pose.position.x + \
-            diff_pose.pose.position.x + \
-            math.cos(heading_robot) * (diff_pose.pose.position.z - dist_from)
-        desired_pose.pose.position.y = orig_pose.pose.position.y + \
-            diff_pose.pose.position.y + \
-            math.sin(heading_robot) * (diff_pose.pose.position.z - dist_from)
-
-        # QR Code
-        self.log(str(diff_pose.pose.orientation.z))
-
-        desired_pose.pose.orientation.x = quaternion_desired[0]
-        desired_pose.pose.orientation.y = quaternion_desired[1]
-        desired_pose.pose.orientation.z = quaternion_desired[2]
-        desired_pose.pose.orientation.w = quaternion_desired[3]
-
-        return desired_pose
-
     def drive_random(self):
         """[summary]
         Drive randomly and avoid obstacle collision
@@ -300,6 +260,18 @@ class BurgerUtility():
             if (time.time() - start >= duration):
                 return False
 
+    def switch_camera_optical_link_to_base_footprint(self, pose_stamp, dist_from=0):
+        pose_stamp.header.frame_id = "/base_footprint"
+        orig_x = pose_stamp.pose.position.x
+        orig_y = pose_stamp.pose.position.y
+        orig_z = pose_stamp.pose.position.z
+        pose_stamp.pose.position.x = orig_z - dist_from
+        pose_stamp.pose.position.y = -orig_x
+        pose_stamp.pose.position.z = 0
+        pose_stamp.pose.orientation = self.robot_imu_pos.orientation
+
+        return pose_stamp
+
     def transform_qr_code_to_desired_pos(self, qr_code_pos, dist_from, tries=2):
         """[summary]
         Transform QR code position in /MAP frame to /ODOM frame
@@ -314,14 +286,13 @@ class BurgerUtility():
         """
         for i in range(tries):
             try:
-                qr_code_pos_odom_frame = self.qr_code_util.transform_pose_in_frames(
-                    qr_code_pos, '/odom', '/map')
+                qr_code_pos = self.switch_camera_optical_link_to_base_footprint(
+                    qr_code_pos)
+                desired_pose = self.qr_code_util.transform_pose_in_frames(
+                    qr_code_pos, '/odom', '/base_footprint')
 
-                # Internal class component updating robot position
-                robot_pose = self.robot_pos.pose
-
-                desired_pose = self.get_desired_position_on_qr_code(
-                    robot_pose, qr_code_pos_odom_frame, dist_from=dist_from)
+                self.log("Desired positon in odometry frame of QR: " +
+                         str(desired_pose))
                 return desired_pose
             except Exception:
                 print("Did not find transformation")
@@ -384,7 +355,7 @@ class BurgerUtility():
             return True
 
         return False
-    
+
     def drive_towards_qr_code(self):
         # Orient correct
         self.move_to_pose(self.saved_robot_pos.pose.pose)
@@ -398,7 +369,8 @@ class BurgerUtility():
         return pose
 
     def drive_patrol(self):
-        patrol_points = [[-4.6, 1.1], [-6.0, 0.28], [-4.8, -2.2], [0.9, 0.6], [4.7, 1.1], [5.6, -2.0]]
+        patrol_points = [[-4.6, 1.1], [-6.0, 0.28],
+                         [-4.8, -2.2], [0.9, 0.6], [4.7, 1.1], [5.6, -2.0]]
 
         patrol_point_pose = self.patrol_point(patrol_points[self.next_target])
 
@@ -408,7 +380,7 @@ class BurgerUtility():
 
         if self.move_to_pose_looking_for_qr_code(patrol_point_pose, stop_before_any=True):
             return True
-        
+
         return self.find_qr_code_turn_around(new=True)
 
     def find_qr_code(self, new=False):
@@ -416,13 +388,15 @@ class BurgerUtility():
         Description of function here
         """
         self.log("Searching for QR code")
-        
-        while not rospy.is_shutdown():    
+
+        while not rospy.is_shutdown():
             if self.drive_patrol():
                 break
 
         self.log("Found QR Code orient robot again")
         self.drive_towards_qr_code()
+
+        return True
 
     def drive_to_next_qr_code(self, next_x_y):
         """[summary]

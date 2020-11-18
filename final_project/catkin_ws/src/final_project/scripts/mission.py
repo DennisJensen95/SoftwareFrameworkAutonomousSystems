@@ -15,7 +15,7 @@ def read_and_save_qr_code(qr_code_util, burger):
     # Save the code message
     if isinstance(qr_code_pos_odom, bool):
         return False
-    
+
     qr_code_util.save_code_message(qr_code_pos_odom.pose.position)
 
     return True
@@ -39,13 +39,9 @@ def main():
         burger.drive_to_qr_code(qr_code_pos, dist_from=1.2)
 
         read_and_save_qr_code(qr_code_util, burger)
-        
-        print(qr_code_util.get_number_of_qr_codes())
+        qr_code_util.print_saved_qr_codes()
         if qr_code_util.get_number_of_qr_codes() >= 2:
             break
-
-        qr_code_util.print_saved_qr_codes()
-
 
     # Create the transform from /odom frame to /hidden_frame
     qr_code_util.create_transform_from_odom_to_hidden_frame()
@@ -58,6 +54,7 @@ def main():
             burger.drive_to_next_qr_code(next_x_y)
             burger.find_qr_code_turn_around(new=True)
             read_and_save_qr_code(qr_code_util, burger)
+            qr_code_util.print_saved_qr_codes()
 
     rospy.signal_shutdown("Mission done")
 

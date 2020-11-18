@@ -8,6 +8,8 @@ import re
 import numpy as np
 from kabsch import rigid_transform_3D
 from tf.transformations import quaternion_from_matrix, rotation_matrix
+import signal
+import sys
 
 
 class QrCodeUtility():
@@ -21,6 +23,9 @@ class QrCodeUtility():
         """
 
         self.log_tag = "[QR Code Utility]:"
+
+        # Signal handler
+        signal.signal(signal.SIGINT, self.signal_handler)
 
         # QR code message
         self.saved_code_message = ""
@@ -50,6 +55,11 @@ class QrCodeUtility():
                          String, self.callback_qr_code_message)
         rospy.Subscriber("/visp_auto_tracker/object_position",
                          PoseStamped, self.callback_qr_code_position)
+
+    def signal_handler(self, sig, frame):
+        self.log("You pressed Ctrl+C!")
+        self.kill_broadcast_tf = True
+        sys.exit(0)
 
     def callback_qr_code_message(self, payload):
         """[summary]
@@ -88,7 +98,7 @@ class QrCodeUtility():
             self.qr_messages_position.update(data_object)
 
             return True
-        
+
         return False
 
     def get_distance_to_saved_qr_code(self):
@@ -106,7 +116,7 @@ class QrCodeUtility():
                        cur_x_y[0] and pose_x_y[0] - self.margin_error_resemblance <= cur_x_y[0])
         y_pos_state = (pose_x_y[1] + self.margin_error_resemblance >=
                        cur_x_y[1] and pose_x_y[1] - self.margin_error_resemblance <= cur_x_y[1])
-        
+
         # Check if the qr code read is the same as desired
         if x_pos_state and y_pos_state:
             return True
@@ -191,7 +201,7 @@ class QrCodeUtility():
             [bool]: [State detection]
         """
         return self.qr_code_detected
-    
+
     def save_qr_code_position(self):
         """[summary]
         Save the current estimated QR code position
@@ -199,7 +209,7 @@ class QrCodeUtility():
         self.saved_qr_code_position = self.qr_code_position
 
     def print_saved_qr_codes(self):
-        
+
         for i in range(5):
             key = str(i+1)
             if key in self.qr_messages_position:
@@ -245,6 +255,7 @@ class QrCodeUtility():
                     rate.sleep()
                 except rospy.exceptions.ROSInterruptException:
                     pass
+
             if self.kill_broadcast_tf:
                 break
 
