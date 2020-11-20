@@ -98,7 +98,7 @@ class MissionPlanning():
             qr_code_pos, self.burger.robot_imu_pos, dist_from=0)
 
         # Save the code message
-        if isinstance(qr_code_pos_odom, bool):
+        if isinstance(qr_code_pos_odom, bool) or isinstance(qr_code_pos_odom, None):
             return False
 
         return qr_code_pos_odom.pose.position
