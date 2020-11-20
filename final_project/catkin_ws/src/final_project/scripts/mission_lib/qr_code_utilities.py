@@ -1,15 +1,8 @@
 #!/usr/bin/env python
 import rospy
 from std_msgs.msg import String
-from geometry_msgs.msg import Pose, PoseStamped
-import tf
-import threading
+from geometry_msgs.msg import PoseStamped
 import re
-import numpy as np
-from kabsch import rigid_transform_3D
-from tf.transformations import quaternion_from_matrix, rotation_matrix
-import signal
-import sys
 
 
 class QrCodeUtility():
@@ -24,13 +17,11 @@ class QrCodeUtility():
 
         self.log_tag = "[QR Code Utility]:"
 
-        # Signal handler
-        signal.signal(signal.SIGINT, self.signal_handler)
-
         # QR code message
         self.saved_code_message = ""
         self.qr_code_message = ""
         self.qr_code_detected = False
+        self.updated_qr_codes = False
 
         # QR code resemblance X Y coordinate
         self.margin_error_resemblance = 0.15
@@ -42,24 +33,19 @@ class QrCodeUtility():
         self.qr_code_position = None
         self.saved_qr_code_position = None
 
-        # Initializing tf broadcaster
-        self.tf_listener = tf.TransformListener()
-        self.kill_broadcast_tf = False
-        self.pose_diff_hidden_frame_to_odom = None
-        self.hidden_frame_tf_thread = threading.Thread(
-            target=self.broadcast_transform_hidden_to_odom)
-        self.hidden_frame_tf_thread.start()
-
         # QR code topics subscribers
         rospy.Subscriber("/visp_auto_tracker/code_message",
                          String, self.callback_qr_code_message)
         rospy.Subscriber("/visp_auto_tracker/object_position",
                          PoseStamped, self.callback_qr_code_position)
 
-    def signal_handler(self, sig, frame):
-        self.log("You pressed Ctrl+C!")
-        self.kill_broadcast_tf = True
-        sys.exit(0)
+    def log(self, msg):
+        """[summary]
+        Generic log message
+        Args:
+            msg ([str]): [Log message]
+        """
+        print(self.log_tag + str(msg))
 
     def callback_qr_code_message(self, payload):
         """[summary]
@@ -88,6 +74,7 @@ class QrCodeUtility():
         Save a QR code message at a specific time and dont change before next save
         """
         if self.qr_code_message != "":
+            self.updated_qr_codes = True
             self.saved_code_message = self.qr_code_message
             next_qr = self.get_saved_next_qr_code_x_y()
             current_qr = self.get_saved_qr_code_x_y()
@@ -111,13 +98,18 @@ class QrCodeUtility():
         return {N: {"L": L, "pos": pos_qr, "next_pos": next_pos_qr, "odom_pos": odom_pos}}
 
     def qr_code_message_coordinates_matches(self, pose_x_y):
-        cur_x_y = self.get_saved_next_qr_code_x_y()
+        cur_x_y = self.get_current_qr_code_x_y()
         x_pos_state = (pose_x_y[0] + self.margin_error_resemblance >=
                        cur_x_y[0] and pose_x_y[0] - self.margin_error_resemblance <= cur_x_y[0])
         y_pos_state = (pose_x_y[1] + self.margin_error_resemblance >=
                        cur_x_y[1] and pose_x_y[1] - self.margin_error_resemblance <= cur_x_y[1])
 
         # Check if the qr code read is the same as desired
+        self.log("Desired_pose: " + str(pose_x_y))
+        self.log("Current_pose: " + str(cur_x_y))
+        self.log("Do QR code match wanted? : " +
+                 str((x_pos_state and y_pos_state)))
+
         if x_pos_state and y_pos_state:
             return True
         else:
@@ -143,6 +135,9 @@ class QrCodeUtility():
 
         return N_found
 
+    def return_qr_code_data(self):
+        return self.qr_messages_position
+
     def get_qr_code_pose(self):
         """[summary]
         Get position fo QR code detected
@@ -153,7 +148,7 @@ class QrCodeUtility():
 
     def get_saved_qr_code_x_y(self):
         """[summary]
-        Current x and y position of code message saved
+        Saved x and y position of code message saved
         Returns:
             [tuple]: [Position in QR code message]
         """
@@ -180,19 +175,19 @@ class QrCodeUtility():
             return (x, y)
         return (0, 0)
 
-    def log(self, msg):
+    def get_current_qr_code_x_y(self):
         """[summary]
-        Generic log message
-        Args:
-            msg ([str]): [Log message]
+        Current x and y position of code message saved
+        Returns:
+            [tuple]: [Position in QR code message]
         """
-        print(self.log_tag + msg)
-
-    def teardown(self):
-        """[summary]
-        Teardown threading
-        """
-        self.hidden_frame_tf_thread.join()
+        if self.qr_code_message != "":
+            coordinates = re.findall(
+                "X=(.*)\\r\\nY=(.*)\\r", self.qr_code_message)[0]
+            x = float(coordinates[0])
+            y = float(coordinates[1])
+            return (x, y)
+        return (0, 0)
 
     def is_qr_code_detected(self):
         """[summary]
@@ -213,80 +208,19 @@ class QrCodeUtility():
         for i in range(5):
             key = str(i+1)
             if key in self.qr_messages_position:
-                self.log(str(self.qr_messages_position[key]))
+                self.log(self.qr_messages_position[key])
 
-    def transform_pose_in_frames(self, pose, target_frame, current_frame):
-        """[summary]
-        Transform a Pose from one frame to another
-        Args:
-            pose ([PoseStamp]): [PoseStamp that needs transformation]
-            target_frame ([str]): [String of target frame]
-            current_frame ([str]): [String of current frame]
+    def print_saved_word(self):
+        word = ""
+        for i in range(5):
+            key = str(i+1)
+            if key in self.qr_messages_position:
+                word += str(self.qr_messages_position[key]["L"])
 
-        Returns:
-            [PoseStamp]: [PoseStamp of the pose in target frame]
-        """
-        now = rospy.Time.now()
-        self.tf_listener.waitForTransform(
-            target_frame, current_frame, now, rospy.Duration(4.0))
-        pose_odo_frame = self.tf_listener.transformPose(target_frame, pose)
+        print("Winning word is: " + word)
 
-        return pose_odo_frame
+    def is_qr_codes_data_updated(self):
+        return self.updated_qr_codes
 
-    def broadcast_transform_hidden_to_odom(self,):
-        """[summary]
-        Broadcasting transform from hidden to odometry frame when found
-        """
-        br = tf.TransformBroadcaster()
-        rate = rospy.Rate(10.0)
-
-        while not rospy.is_shutdown():
-            if not (self.pose_diff_hidden_frame_to_odom == None):
-                rotation = self.pose_diff_hidden_frame_to_odom.orientation
-                rot_tuple = (rotation.x, rotation.y, rotation.z, rotation.w)
-                translation = self.pose_diff_hidden_frame_to_odom.position
-                trans_tuple = (translation.x, translation.y, translation.z)
-                # self.log("Translation is: " + str(trans_tuple))
-                # self.log("Rotation is: " + str(rot_tuple))
-                try:
-
-                    br.sendTransform(trans_tuple, rot_tuple,
-                                     rospy.Time.now(), "hidden_frame", "odom")
-                    rate.sleep()
-                except rospy.exceptions.ROSInterruptException:
-                    pass
-
-            if self.kill_broadcast_tf:
-                break
-
-    def create_transform_from_odom_to_hidden_frame(self):
-        """[summary]
-        Create a transform for transforming from odometry frame to hidden frame
-        Args:
-            qr_code_position_odo ([Pose]): [QR code position in odemetry coordinates]
-        """
-
-        A = []
-        B = []
-        for key in self.qr_messages_position.keys():
-            data = self.qr_messages_position[key]
-            A.append([data["pos"][0], data["pos"][1], 0])
-            B.append([data["odom_pos"].x, data["odom_pos"].y, 0])
-
-        A = np.transpose(np.array(A))
-        B = np.transpose(np.array(B))
-        (R, t) = rigid_transform_3D(A, B)
-        R = np.array(R)
-        R = np.append(R, np.array([[0, 0, 0]]), axis=0)
-        R = np.append(R, np.array([[0], [0], [0], [1]]), axis=1)
-        t = t[:, 0]
-
-        quaternion_change = quaternion_from_matrix(R)
-        self.pose_diff_hidden_frame_to_odom = Pose()
-        self.pose_diff_hidden_frame_to_odom.position.x = t[0]
-        self.pose_diff_hidden_frame_to_odom.position.y = t[1]
-        self.pose_diff_hidden_frame_to_odom.position.z = t[2]
-        self.pose_diff_hidden_frame_to_odom.orientation.x = quaternion_change[0]
-        self.pose_diff_hidden_frame_to_odom.orientation.y = quaternion_change[1]
-        self.pose_diff_hidden_frame_to_odom.orientation.z = quaternion_change[2]
-        self.pose_diff_hidden_frame_to_odom.orientation.w = quaternion_change[3]
+    def set_updated_qr_codes(self, bool):
+        self.updated_qr_codes = bool
