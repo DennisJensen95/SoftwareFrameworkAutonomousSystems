@@ -155,17 +155,7 @@ class FrameUtilities():
         pose_stamp.pose.position.x = orig_z
         pose_stamp.pose.position.y = -orig_x
         pose_stamp.pose.position.z = 0
-        (roll, pitch, yaw) = self.convert_orientation_to_euler(
-            pose_stamp.pose.orientation)
-        # Turning camera optical frame to base_footprint frame
-        roll = roll - math.pi
-        yaw = yaw + math.pi
 
-        quaternion = quaternion_from_euler(roll, pitch, yaw)
-        # pose_stamp.pose.orientation.x = quaternion[0]
-        # pose_stamp.pose.orientation.y = quaternion[1]
-        # pose_stamp.pose.orientation.z = quaternion[2]
-        # pose_stamp.pose.orientation.w = quaternion[3]
         pose_stamp.pose.orientation = robot_imu_pose.orientation
         return pose_stamp
 

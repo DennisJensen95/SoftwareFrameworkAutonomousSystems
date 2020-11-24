@@ -91,12 +91,23 @@ class QrCodeUtility():
     def qr_codes_data_object(self, N, L, pos_qr, next_pos_qr, odom_pos):
         return {N: {"L": L, "pos": pos_qr, "next_pos": next_pos_qr, "odom_pos": odom_pos}}
 
+    def check_if_qr_code_position_is_unknown(self, next_x_y):
+        for key in self.qr_messages_position.keys():
+            if self.match_two_points(next_x_y, self.qr_messages_position[key]["next_pos"]):
+                return False
+        
+        return True
+
+    def match_two_points(self, point1, point2):
+        x_pos_state = (point1[0] + self.margin_error_resemblance >=
+                       point2[0] and point1[0] - self.margin_error_resemblance <= point2[0])
+        y_pos_state = (point1[1] + self.margin_error_resemblance >=
+                       point2[1] and point1[1] - self.margin_error_resemblance <= point2[1])
+
+        return (x_pos_state, y_pos_state)
+
     def qr_code_message_coordinates_matches(self, pose_x_y):
         cur_x_y = self.get_current_qr_code_x_y()
-        x_pos_state = (pose_x_y[0] + self.margin_error_resemblance >=
-                       cur_x_y[0] and pose_x_y[0] - self.margin_error_resemblance <= cur_x_y[0])
-        y_pos_state = (pose_x_y[1] + self.margin_error_resemblance >=
-                       cur_x_y[1] and pose_x_y[1] - self.margin_error_resemblance <= cur_x_y[1])
 
         # Check if the qr code read is the same as desired
         self.log("Desired_pose: " + str(pose_x_y))

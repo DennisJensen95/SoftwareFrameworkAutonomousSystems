@@ -44,6 +44,9 @@ def mission_part_two(mission_planning, burger, qr_code_util):
 
         for qr_code in known_qr_codes.keys():
             next_x_y = known_qr_codes[qr_code]["next_pos"]
+            
+            if qr_code_util.check_if_qr_code_position_is_unknown(next_x_y):
+                continue
 
             # Drive towards next QR code
             found_qr_code = mission_planning.drive_to_next_qr_code(next_x_y)
