@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-from kabsch import rigid_transform_3D
 import rospy
 from tf.transformations import quaternion_from_matrix
 import tf
@@ -132,7 +131,7 @@ class FrameUtilities():
 
         A = np.transpose(np.array(A))
         B = np.transpose(np.array(B))
-        (R, t) = rigid_transform_3D(A, B)
+        (R, t) = self.rigid_transform_3D(A, B)
         R = np.array(R)
         R = np.append(R, np.array([[0, 0, 0]]), axis=0)
         R = np.append(R, np.array([[0], [0], [0], [1]]), axis=1)
@@ -214,3 +213,62 @@ class FrameUtilities():
             math.sin(yaw)*dist_from
         self.log(desired_pose)
         return desired_pose
+
+    def rigid_transform_3D(A, B):
+        """[summary]
+        Will make a transformation from one frame to another based on a number of points.
+        At least two.
+
+        Args:
+            A ([Matrix]): [Matrix containing coordinates of points in one frame]
+            B ([type]): [Matrix containing coordinates of points in another frame]
+
+        Raises:
+            Exception: [If not enoguh points is present in either frame]
+            Exception: [If not enoguh points is present in either frame]
+
+        Returns:
+            [tuple]: [Tuple of rotation and translation from one frame to the other]
+        """
+        assert A.shape == B.shape
+
+        num_rows, num_cols = A.shape
+        if num_rows != 3:
+            raise Exception("matrix A is not 3xN, it is %dx%d", num_rows, num_cols)
+
+        num_rows, num_cols = B.shape
+        if num_rows != 3:
+            raise Exception("matrix B is not 3xN, it is %dx%d", num_rows, num_cols)
+
+        # find mean column wise
+        centroid_A = np.mean(A, axis=1)
+        centroid_B = np.mean(B, axis=1)
+
+        # ensure centroids are 3x1
+        centroid_A = centroid_A.reshape(-1, 1)
+        centroid_B = centroid_B.reshape(-1, 1)
+
+        # subtract mean
+        Am = A - centroid_A
+        Bm = B - centroid_B
+
+        H = np.matmul(Am, np.transpose(Bm))
+
+        # sanity check
+        # if linalg.matrix_rank(H) < 3:
+        #    raise ValueError("rank of H = {}, expecting 3".format(linalg.matrix_rank(H)))
+
+        # find rotation
+        U, S, Vt = np.linalg.svd(H)
+        R = np.matmul(Vt.T, U.T)
+
+        # special reflection case
+        if np.linalg.det(R) < 0:
+            print("det(R) < R, reflection detected!, correcting for it ...")
+            Vt[2, :] *= -1
+            R = np.matmul(Vt.T, U.T)
+
+        t = np.matmul(-R, centroid_A) + centroid_B
+
+        return R, t
+
