@@ -23,17 +23,19 @@ def mission_part_one(mission_planning, burger, qr_code_util):
     """
     found_qr_code = False
     while True:
-        if found_qr_code:
-            mission_planning.find_qr_code_turn_around(new=True)
         # Find QR Code
         found_qr_code = mission_planning.find_qr_code()
 
-        read_and_save_qr_code(mission_planning)
+        if found_qr_code:
+            read_and_save_qr_code(mission_planning)
 
+        # Logging saved QR codes
         qr_code_util.print_saved_qr_codes()
-
         if qr_code_util.get_number_of_qr_codes() >= 2:
             break
+
+        if found_qr_code:
+            mission_planning.find_qr_code_turn_around(new=True)
 
 
 def mission_part_two(mission_planning, burger, qr_code_util):
@@ -44,15 +46,13 @@ def mission_part_two(mission_planning, burger, qr_code_util):
             next_x_y = known_qr_codes[qr_code]["next_pos"]
 
             # Drive towards next QR code
-            mission_planning.drive_to_next_qr_code(next_x_y)
+            found_qr_code = mission_planning.drive_to_next_qr_code(next_x_y)
+            
+            if found_qr_code:
+                read_and_save_qr_code(mission_planning)
 
-            # Did not find it driving towards it - turn around to check again
-            mission_planning.find_qr_code_turn_around(new=True)
-
-            # Read and save QR code
-            read_and_save_qr_code(mission_planning)
+            # Logging saved QR codes
             qr_code_util.print_saved_qr_codes()
-
             if qr_code_util.get_number_of_qr_codes() == 5:
                 log("Found five QR codes mission is done!")
                 break

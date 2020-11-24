@@ -88,12 +88,6 @@ class QrCodeUtility():
 
         return False
 
-    def get_distance_to_saved_qr_code(self):
-        """[summary]
-        Return the distance to QR Code
-        """
-        return self.saved_qr_code_position.pose.position.z
-
     def qr_codes_data_object(self, N, L, pos_qr, next_pos_qr, odom_pos):
         return {N: {"L": L, "pos": pos_qr, "next_pos": next_pos_qr, "odom_pos": odom_pos}}
 

@@ -27,6 +27,16 @@ class MissionPlanning():
         print(self.log_tag + str(msg))
 
     def drive_to_qr_code(self, qr_code_pos, dist_from=1.3):
+        """[summary]
+        Driving to QR code for reading it.
+
+        Args:
+            qr_code_pos ([type]): [description]
+            dist_from (float, optional): [description]. Defaults to 1.3.
+
+        Returns:
+            [type]: [description]
+        """
         qr_code_pos = self.transform.transform_qr_code_to_desired_pos(
             qr_code_pos, self.burger.robot_imu_pos, dist_from=dist_from)
 
@@ -124,5 +134,6 @@ class MissionPlanning():
         if self.burger.move_to_pose_looking_for_qr_code(desired_pose, next_x_y):
             qr_code_pos = self.burger.read_qr_code(duration=0.2)
             self.drive_to_qr_code(qr_code_pos)
+            return True
 
-        return True
+        return False

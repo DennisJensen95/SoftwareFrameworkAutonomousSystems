@@ -176,7 +176,7 @@ class FrameUtilities():
 
     def transform_qr_code_to_desired_pos(self, qr_code_pos, robot_imu_pose, dist_from, tries=2):
         """[summary]
-        Transform QR code position in /MAP frame to /ODOM frame
+        Transform QR code position in /CAMERA_OPTICAL_LINK frame to /ODOM frame
 
         Args:
             qr_code_pos ([PoseStamp]): [QR code position in /map frame]
@@ -211,6 +211,7 @@ class FrameUtilities():
             math.cos(yaw)*dist_from
         desired_pose.pose.position.y = desired_pose.pose.position.y - \
             math.sin(yaw)*dist_from
+
         self.log(desired_pose)
         return desired_pose
 
