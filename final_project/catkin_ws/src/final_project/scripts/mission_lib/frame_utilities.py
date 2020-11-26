@@ -184,7 +184,6 @@ class FrameUtilities():
         num_try = 0
         while True:
             num_try += 1
-            self.log("Try: " + str(num_try))
             try:
                 desired_pose = self.transform_pose_in_frames(
                     qr_code_pos, '/odom', '/base_footprint')
@@ -202,10 +201,9 @@ class FrameUtilities():
         desired_pose.pose.position.y = desired_pose.pose.position.y - \
             math.sin(yaw)*dist_from
 
-        self.log(desired_pose)
         return desired_pose
 
-    def rigid_transform_3D(A, B):
+    def rigid_transform_3D(self, A, B):
         """[summary]
         Will make a transformation from one frame to another based on a number of points.
         At least two.
@@ -225,11 +223,13 @@ class FrameUtilities():
 
         num_rows, num_cols = A.shape
         if num_rows != 3:
-            raise Exception("matrix A is not 3xN, it is %dx%d", num_rows, num_cols)
+            raise Exception("matrix A is not 3xN, it is %dx%d",
+                            num_rows, num_cols)
 
         num_rows, num_cols = B.shape
         if num_rows != 3:
-            raise Exception("matrix B is not 3xN, it is %dx%d", num_rows, num_cols)
+            raise Exception("matrix B is not 3xN, it is %dx%d",
+                            num_rows, num_cols)
 
         # find mean column wise
         centroid_A = np.mean(A, axis=1)
@@ -245,21 +245,10 @@ class FrameUtilities():
 
         H = np.matmul(Am, np.transpose(Bm))
 
-        # sanity check
-        # if linalg.matrix_rank(H) < 3:
-        #    raise ValueError("rank of H = {}, expecting 3".format(linalg.matrix_rank(H)))
-
         # find rotation
         U, S, Vt = np.linalg.svd(H)
         R = np.matmul(Vt.T, U.T)
 
-        # special reflection case
-        if np.linalg.det(R) < 0:
-            print("det(R) < R, reflection detected!, correcting for it ...")
-            Vt[2, :] *= -1
-            R = np.matmul(Vt.T, U.T)
-
         t = np.matmul(-R, centroid_A) + centroid_B
 
         return R, t
-

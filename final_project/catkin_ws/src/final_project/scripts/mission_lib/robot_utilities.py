@@ -171,6 +171,7 @@ class BurgerUtility():
 
             elif next_x_y != None and self.check_if_qr_code(new=False, stop=False):
                 if self.qr_code_util.qr_code_message_coordinates_matches(next_x_y):
+                    self.stop_moving()
                     self.check_if_qr_code(new=False)
                     self.log("Found the correct new QR code")
                     return True
@@ -184,7 +185,7 @@ class BurgerUtility():
         Returns:
             [PoseStamped]: [Position of QR code and coordinate frame]
         """
-        sleep(1)
+        rospy.sleep(1)
         start = time.time()
         position_x = []
         position_y = []

@@ -43,6 +43,7 @@ class MissionPlanning():
         if isinstance(qr_code_pos, bool):
             return False
 
+        # Turn to original orientation when detected qr code
         qr_code_pos.pose.orientation = self.burger.saved_robot_pos.pose.pose.orientation
 
         goal_pose = self.burger.get_goal_pose(qr_code_pos)
@@ -91,6 +92,10 @@ class MissionPlanning():
         self.log("Found QR Code orient robot again")
         self.burger.orient_to_saved_robot_pos()
 
+        # Check after orienting that it does have a QR code detected
+        if not self.qr_code_util.qr_code_detected:
+            return False
+
         qr_code_pos = self.burger.read_qr_code(duration=0.5)
 
         self.drive_to_qr_code(qr_code_pos)
@@ -132,7 +137,8 @@ class MissionPlanning():
                  " Odom frame: " + str(desired_pose.position))
 
         if self.burger.move_to_pose_looking_for_qr_code(desired_pose, next_x_y):
-            qr_code_pos = self.burger.read_qr_code(duration=0.2)
+            self.burger.orient_to_saved_robot_pos()
+            qr_code_pos = self.burger.read_qr_code(duration=1)
             self.drive_to_qr_code(qr_code_pos)
             return True
 

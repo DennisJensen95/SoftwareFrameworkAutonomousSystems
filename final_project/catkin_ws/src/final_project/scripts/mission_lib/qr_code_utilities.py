@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 import rospy
 from std_msgs.msg import String
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
 import re
+import numpy as np
 
 
 class QrCodeUtility():
@@ -22,6 +23,7 @@ class QrCodeUtility():
         self.qr_code_message = ""
         self.qr_code_detected = False
         self.updated_qr_codes = False
+        self.qr_cov_margin = 0.01
 
         # QR code resemblance X Y coordinate
         self.margin_error_resemblance = 0.15
@@ -38,6 +40,8 @@ class QrCodeUtility():
                          String, self.callback_qr_code_message)
         rospy.Subscriber("/visp_auto_tracker/object_position",
                          PoseStamped, self.callback_qr_code_position)
+        rospy.Subscriber("/visp_auto_tracker/object_position_covariance",
+                         PoseWithCovarianceStamped, self.callback_qr_code_covariance)
 
     def log(self, msg):
         """[summary]
@@ -69,6 +73,9 @@ class QrCodeUtility():
         if self.qr_code_detected:
             self.qr_code_position = payload
 
+    def callback_qr_code_covariance(self, payload):
+        self.qr_covariance = np.sum(np.array(payload.pose.covariance))
+
     def save_code_message(self, qr_code_pos_odom):
         """[summary]
         Save a QR code message at a specific time and dont change before next save
@@ -93,9 +100,9 @@ class QrCodeUtility():
 
     def check_if_qr_code_position_is_unknown(self, next_x_y):
         for key in self.qr_messages_position.keys():
-            if self.match_two_points(next_x_y, self.qr_messages_position[key]["next_pos"]):
+            if self.match_two_points(next_x_y, self.qr_messages_position[key]["pos"]):
                 return False
-        
+
         return True
 
     def match_two_points(self, point1, point2):
@@ -104,21 +111,14 @@ class QrCodeUtility():
         y_pos_state = (point1[1] + self.margin_error_resemblance >=
                        point2[1] and point1[1] - self.margin_error_resemblance <= point2[1])
 
-        return (x_pos_state, y_pos_state)
-
-    def qr_code_message_coordinates_matches(self, pose_x_y):
-        cur_x_y = self.get_current_qr_code_x_y()
-
-        # Check if the qr code read is the same as desired
-        self.log("Desired_pose: " + str(pose_x_y))
-        self.log("Current_pose: " + str(cur_x_y))
-        self.log("Do QR code match wanted? : " +
-                 str((x_pos_state and y_pos_state)))
-
         if x_pos_state and y_pos_state:
             return True
         else:
             return False
+
+    def qr_code_message_coordinates_matches(self, pose_x_y):
+        cur_x_y = self.get_current_qr_code_x_y()
+        return self.match_two_points(pose_x_y, cur_x_y)
 
     def is_new_qr_code(self):
         found_qr_codes = self.return_found_qr_codes()
@@ -206,7 +206,10 @@ class QrCodeUtility():
         """[summary]
         Save the current estimated QR code position
         """
-        self.saved_qr_code_position = self.qr_code_position
+        if self.qr_covariance < self.qr_cov_margin:
+            self.saved_qr_code_position = self.qr_code_position
+        else:
+            self.log("Did not save QR code because covariance was too high")
 
     def print_saved_qr_codes(self):
 
