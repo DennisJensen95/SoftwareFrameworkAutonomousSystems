@@ -93,6 +93,9 @@ class MissionPlanning():
 
         qr_code_pos = self.burger.read_qr_code(duration=1.5)
 
+        if qr_code_pos == None:
+            return False
+
         self.drive_to_qr_code(qr_code_pos)
 
         return found_qr_code
