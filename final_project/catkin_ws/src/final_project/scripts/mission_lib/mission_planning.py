@@ -86,11 +86,10 @@ class MissionPlanning():
         found_qr_code = False
         while not rospy.is_shutdown():
             found_qr_code = self.burger.drive_patrol()
-            if found_qr_code:
-                break
 
-        self.log("Found QR Code orient robot again")
-        self.burger.orient_to_saved_robot_pos()
+            if found_qr_code:
+                self.burger.stop_moving()
+                break
 
         qr_code_pos = self.burger.read_qr_code(duration=1.5)
 
@@ -136,14 +135,12 @@ class MissionPlanning():
     def drive_around_qr_code(self, desired_pose_qr, next_x_y):
         self.log("Drive around qr code")
         (x_robot, y_robot, _) = self.burger.get_robot_x_y_position()
-        self.log(desired_pose_qr)
         x_qr = desired_pose_qr.position.x
         y_qr = desired_pose_qr.position.y
-        angle = math.atan2(y_robot - y_qr, x_robot - x_qr)
-        self.log("Angle" + str(angle))
+        angle = math.atan2(y_qr - y_robot, x_qr - x_robot)
         placement_x_y = self.get_heading_quadrant(angle)
-        self.log(str(placement_x_y))
-        points_diff = [[1, 0], [0, 1]]
+        points_diff = [[1.5, 0], [0, 1.5]]
+
         for i in range(len(points_diff)):
             self.log(i)
             go_to_pose = desired_pose_qr
@@ -151,10 +148,15 @@ class MissionPlanning():
                 placement_x_y[0] * points_diff[i][0]
             go_to_pose.position.y = go_to_pose.position.y + \
                 placement_x_y[1] * points_diff[i][1]
-            if self.burger.move_to_pose_looking_for_qr_code(go_to_pose, next_x_y):
+
+            if self.burger.move_to_pose_looking_for_qr_code(go_to_pose, next_x_y=next_x_y):
+                self.burger.save_robot_pose()
+                self.burger.stop_moving()
                 return True
 
             if self.burger.find_qr_code_turn_around(new=False, next_x_y=next_x_y):
+                self.burger.save_robot_pose()
+                self.burger.stop_moving()
                 return True
 
         return False

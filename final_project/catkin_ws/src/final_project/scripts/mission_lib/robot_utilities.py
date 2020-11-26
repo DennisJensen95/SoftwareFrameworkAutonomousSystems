@@ -5,10 +5,9 @@ import rospy
 from nav_msgs.msg import Odometry
 import actionlib
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
-from geometry_msgs.msg import Twist, Pose, PoseStamped
+from geometry_msgs.msg import Twist, Pose
 from sensor_msgs.msg import Imu
 from sensor_msgs.msg import LaserScan
-from tf.transformations import euler_from_quaternion, quaternion_from_euler
 import math
 import time
 import numpy as np
@@ -159,13 +158,23 @@ class BurgerUtility():
         goal = self.goal_pose(pose)
         self.burger.send_goal(goal)
 
+        timeout = 40
+        start = time.time()
         while True:
-            # If the robot is in the desired position
-            if self.burger.wait_for_result(rospy.Duration(0.3)):
-                self.stop_moving()
+            state = self.burger.get_state()
+            if state == actionlib.GoalStatus.ABORTED:
+                self.log("Goal aborted")
                 return False
 
-            elif stop_before_any and self.check_if_qr_code(new=True):
+            elif state == actionlib.GoalStatus.LOST:
+                self.log("Burger lost goal")
+                return False
+
+            elif state == actionlib.GoalStatus.SUCCEEDED:
+                self.log("Burger found destination but did not find QR")
+                return False
+
+            elif stop_before_any and self.check_if_qr_code(new=True, stop=False):
                 self.log("Found an abritary QR code")
                 self.stop_moving()
                 return True
@@ -177,6 +186,10 @@ class BurgerUtility():
                     self.log("Found the correct new QR code")
                     return True
 
+            elif (time.time() - start >= timeout):
+                self.log("Move to pose looking for qr code timeout")
+                return False
+
     def read_qr_code(self, duration):
         """[summary]
         Will read the QR code position for a specific duration accumulating and averaging results
@@ -186,6 +199,7 @@ class BurgerUtility():
         Returns:
             [PoseStamped]: [Position of QR code and coordinate frame]
         """
+        self.log("Read QR code")
         rospy.sleep(1)
         start = time.time()
         position_x = []
@@ -213,6 +227,7 @@ class BurgerUtility():
         qr_code.pose.orientation.y = np.average(np.array(orientation_y))
         qr_code.pose.orientation.z = np.average(np.array(orientation_z))
         qr_code.pose.orientation.w = np.average(np.array(orientation_w))
+        self.save_robot_pose()
 
         return qr_code
 
@@ -224,6 +239,7 @@ class BurgerUtility():
         self.cmd_vel_pub.publish(twist)
 
     def stop_moving(self):
+        self.log("Stop moving")
         self.burger.cancel_all_goals()
         twist = Twist()
         twist.linear.x = 0
