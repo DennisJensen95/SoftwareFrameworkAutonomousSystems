@@ -174,9 +174,8 @@ class BurgerUtility():
                 self.log("Burger found destination but did not find QR")
                 return False
 
-            elif stop_before_any and self.check_if_qr_code(new=True, stop=False):
+            elif stop_before_any and self.check_if_qr_code(new=True, stop=True):
                 self.log("Found an abritary QR code")
-                self.stop_moving()
                 return True
 
             elif next_x_y != None and self.check_if_qr_code(new=False, stop=False):
@@ -284,7 +283,7 @@ class BurgerUtility():
         pose.orientation = self.robot_pos.pose.pose.orientation
         return pose
 
-    def check_if_qr_code(self, new, stop=True):
+    def check_if_qr_code(self, new, stop):
         """[summary]
         Args:
             new ([bool]): [Get a new QR code]
@@ -307,15 +306,15 @@ class BurgerUtility():
         (_, _, start_angle) = self.transform.convert_orientation_to_euler(
             self.robot_imu_pos.orientation)
         accumulated_turn = 0
+
         while not rospy.is_shutdown():
 
             self.turn_around()
             if next_x_y == None:
-                if self.check_if_qr_code(new):
-                    self.stop_moving()
+                if self.check_if_qr_code(new, stop=True):
                     return True
             else:
-                if self.check_if_qr_code(new):
+                if self.check_if_qr_code(new, stop=False):
                     if self.qr_code_util.qr_code_message_coordinates_matches(next_x_y):
                         self.stop_moving()
                         return True

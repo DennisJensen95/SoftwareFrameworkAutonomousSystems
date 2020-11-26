@@ -80,7 +80,7 @@ class QrCodeUtility():
         """[summary]
         Save a QR code message at a specific time and dont change before next save
         """
-        if self.qr_code_message != "" and self.qr_covariance < self.qr_cov_margin:
+        if self.qr_code_message != "" and self.qr_covariance < self.qr_cov_margin and qr_code_pos_odom != False:
             self.updated_qr_codes = True
             self.saved_code_message = self.qr_code_message
             next_qr = self.get_saved_next_qr_code_x_y()

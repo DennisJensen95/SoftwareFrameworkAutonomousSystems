@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import math
 import rospy
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Pose
 
 
 class MissionPlanning():
@@ -135,22 +135,36 @@ class MissionPlanning():
 
         return (0, 0)
 
-    def drive_around_qr_code(self, desired_pose_qr, next_x_y):
+    def drive_around_qr_code(self, qr_code_position, next_x_y):
         self.log("Drive around qr code")
         (x_robot, y_robot, _) = self.burger.get_robot_x_y_position()
-        x_qr = desired_pose_qr.position.x
-        y_qr = desired_pose_qr.position.y
+        x_qr = qr_code_position.position.x
+        y_qr = qr_code_position.position.y
+
         angle = math.atan2(y_qr - y_robot, x_qr - x_robot)
         placement_x_y = self.get_heading_quadrant(angle)
-        points_diff = [[1.5, 0], [0, 1.5]]
+        dist_to_qr = 1.5
+        points_diff = [[dist_to_qr, 0], [0, dist_to_qr]]
 
-        for i in range(len(points_diff)):
-            self.log(i)
-            go_to_pose = desired_pose_qr
-            go_to_pose.position.x = go_to_pose.position.x + \
-                placement_x_y[0] * points_diff[i][0]
-            go_to_pose.position.y = go_to_pose.position.y + \
-                placement_x_y[1] * points_diff[i][1]
+        point_x_1 = qr_code_position.position.x + \
+            placement_x_y[0] * points_diff[0][0]
+        point_y_1 = qr_code_position.position.y + \
+            placement_x_y[1] * points_diff[0][1]
+
+        point_x_2 = qr_code_position.position.x + \
+            placement_x_y[0] * points_diff[1][0]
+        point_y_2 = qr_code_position.position.y + \
+            placement_x_y[1] * points_diff[1][1]
+
+        points = [[point_x_1, point_y_1], [point_x_2, point_y_2]]
+
+        go_to_pose = Pose()
+        go_to_pose.position = qr_code_position.position
+        go_to_pose.orientation = qr_code_position.orientation
+
+        for i in range(len(points)):
+            go_to_pose.position.x = points[i][0]
+            go_to_pose.position.y = points[i][1]
 
             if self.burger.move_to_pose_looking_for_qr_code(go_to_pose, next_x_y=next_x_y):
                 self.burger.save_robot_pose()
