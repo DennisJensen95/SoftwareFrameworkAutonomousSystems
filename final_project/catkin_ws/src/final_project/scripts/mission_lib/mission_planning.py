@@ -86,15 +86,15 @@ class MissionPlanning():
         found_qr_code = False
         while not rospy.is_shutdown():
             found_qr_code = self.burger.drive_patrol()
-
             if found_qr_code:
                 self.burger.stop_moving()
                 break
+            self.burger.increment_patrol_target()
 
         qr_code_pos = self.burger.read_qr_code(duration=1.5)
 
         self.drive_to_qr_code(qr_code_pos)
-        self.burger.increment_patrol_target()
+
         return found_qr_code
 
     def find_qr_code_turn_around(self, new=True):
