@@ -23,7 +23,7 @@ class BurgerUtility():
         """
             Initialize Robot Class
         """
-        self.log_tag = "[Robot Utilities]:"
+        self.log_tag = "[Robot Utilities]: "
 
         # QR code utilities
         self.qr_code_util = QrCodeUtil
@@ -167,12 +167,13 @@ class BurgerUtility():
 
             elif stop_before_any and self.check_if_qr_code(new=True):
                 self.log("Found an abritary QR code")
+                self.stop_moving()
                 return True
 
             elif next_x_y != None and self.check_if_qr_code(new=False, stop=False):
                 if self.qr_code_util.qr_code_message_coordinates_matches(next_x_y):
                     self.stop_moving()
-                    self.check_if_qr_code(new=False)
+                    self.save_robot_imu_pose()
                     self.log("Found the correct new QR code")
                     return True
 
@@ -285,7 +286,7 @@ class BurgerUtility():
 
             return True
 
-    def find_qr_code_turn_around(self, new=True):
+    def find_qr_code_turn_around(self, new=True, next_x_y=None):
         self.log("Searching for QR code")
         (_, _, start_angle) = self.transform.convert_orientation_to_euler(
             self.robot_imu_pos.orientation)
@@ -293,9 +294,15 @@ class BurgerUtility():
         while not rospy.is_shutdown():
 
             self.turn_around()
-            if self.check_if_qr_code(new):
-                self.stop_moving()
-                return True
+            if next_x_y == None:
+                if self.check_if_qr_code(new):
+                    self.stop_moving()
+                    return True
+            else:
+                if self.check_if_qr_code(new):
+                    if self.qr_code_util.qr_code_message_coordinates_matches(next_x_y):
+                        self.stop_moving()
+                        return True
 
             (_, _, current_angle) = self.transform.convert_orientation_to_euler(
                 self.robot_imu_pos.orientation)
@@ -309,17 +316,21 @@ class BurgerUtility():
 
             start_angle = current_angle
 
+    def increment_patrol_target(self):
+        self.log("Increment patrol target")
+        self.next_target += 1
+
     def drive_patrol(self):
         patrol_points = [[-4.6, 1.1], [-6.0, 0.28],
                          [-4.8, -2.2], [0.9, 0.6], [4.7, 1.1], [5.6, -2.0]]
 
         patrol_point_pose = self.patrol_point(patrol_points[self.next_target])
 
-        # update next_target
-        self.next_target += 1
-        self.next_target = self.next_target % len(patrol_points)
-
         if self.move_to_pose_looking_for_qr_code(patrol_point_pose, stop_before_any=True):
+            self.stop_moving()
             return True
 
-        return self.find_qr_code_turn_around(new=True)
+        if self.find_qr_code_turn_around(new=True):
+            self.stop_moving()
+
+        return False

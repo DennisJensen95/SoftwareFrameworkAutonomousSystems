@@ -249,6 +249,12 @@ class FrameUtilities():
         U, S, Vt = np.linalg.svd(H)
         R = np.matmul(Vt.T, U.T)
 
+        # special reflection case
+        if np.linalg.det(R) < 0:
+            print("det(R) < R, reflection detected!, correcting for it ...")
+            Vt[2, :] *= -1
+            R = np.matmul(Vt.T, U.T)
+
         t = np.matmul(-R, centroid_A) + centroid_B
 
         return R, t

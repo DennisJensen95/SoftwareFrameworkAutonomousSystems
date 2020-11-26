@@ -92,14 +92,10 @@ class MissionPlanning():
         self.log("Found QR Code orient robot again")
         self.burger.orient_to_saved_robot_pos()
 
-        # Check after orienting that it does have a QR code detected
-        if not self.qr_code_util.qr_code_detected:
-            return False
-
-        qr_code_pos = self.burger.read_qr_code(duration=0.5)
+        qr_code_pos = self.burger.read_qr_code(duration=1.5)
 
         self.drive_to_qr_code(qr_code_pos)
-
+        self.burger.increment_patrol_target()
         return found_qr_code
 
     def find_qr_code_turn_around(self, new=True):
@@ -121,7 +117,50 @@ class MissionPlanning():
     def save_qr_code_message(self, qr_code_position):
         self.qr_code_util.save_code_message(qr_code_position)
 
+    def get_heading_quadrant(self, angle):
+        # First quadrant
+        if angle >= 0 and angle < math.pi/2:
+            return (-1, -1)
+        # Second quadrant
+        elif angle >= math.pi/2 and angle < math.pi:
+            return (1, -1)
+        # Fourth quadrant
+        elif angle < 0 and angle < -math.pi/2:
+            return (1, -1)
+        # Third quadrant
+        elif angle >= -math.pi/2 and angle < -math.pi:
+            return (1, 1)
+
+        return (0, 0)
+
+    def drive_around_qr_code(self, desired_pose_qr, next_x_y):
+        self.log("Drive around qr code")
+        (x_robot, y_robot, _) = self.burger.get_robot_x_y_position()
+        self.log(desired_pose_qr)
+        x_qr = desired_pose_qr.position.x
+        y_qr = desired_pose_qr.position.y
+        angle = math.atan2(y_robot - y_qr, x_robot - x_qr)
+        self.log("Angle" + str(angle))
+        placement_x_y = self.get_heading_quadrant(angle)
+        self.log(str(placement_x_y))
+        points_diff = [[1, 0], [0, 1]]
+        for i in range(len(points_diff)):
+            self.log(i)
+            go_to_pose = desired_pose_qr
+            go_to_pose.position.x = go_to_pose.position.x + \
+                placement_x_y[0] * points_diff[i][0]
+            go_to_pose.position.y = go_to_pose.position.y + \
+                placement_x_y[1] * points_diff[i][1]
+            if self.burger.move_to_pose_looking_for_qr_code(go_to_pose, next_x_y):
+                return True
+
+            if self.burger.find_qr_code_turn_around(new=False, next_x_y=next_x_y):
+                return True
+
+        return False
+
     def drive_to_next_qr_code(self, next_x_y):
+        self.log("Drive to next qr code")
         """[summary]
         Drive to the next QR code from the last 
         """
@@ -136,7 +175,7 @@ class MissionPlanning():
         self.log("Going to next QR code hidden_frame: " + str(next_x_y) +
                  " Odom frame: " + str(desired_pose.position))
 
-        if self.burger.move_to_pose_looking_for_qr_code(desired_pose, next_x_y):
+        if self.drive_around_qr_code(desired_pose, next_x_y):
             self.burger.orient_to_saved_robot_pos()
             qr_code_pos = self.burger.read_qr_code(duration=1)
             self.drive_to_qr_code(qr_code_pos)
