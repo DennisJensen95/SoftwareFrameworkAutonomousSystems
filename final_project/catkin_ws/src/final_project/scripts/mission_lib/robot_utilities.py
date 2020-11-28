@@ -125,7 +125,7 @@ class BurgerUtility():
 
         return goal_pose
 
-    def move_to_pose(self, pose, duration=rospy.Duration(40), frame="odom"):
+    def move_to_pose(self, pose, duration=40, frame="odom"):
         """[summary]
         Will move the robot to a desired pose
         Args:
@@ -137,7 +137,18 @@ class BurgerUtility():
         """
         goal = self.goal_pose(pose, frame=frame)
         self.burger.send_goal(goal)
-        self.burger.wait_for_result(duration)
+        start = time.time()
+        while True:
+            state = self.burger.get_state()
+            if self.move_to_pose_fail(state):
+                return False
+
+            elif self.move_to_pose_succes(state):
+                break
+
+            elif (time.time() - start >= duration):
+                self.log("Move to pose timed out")
+                return False
 
         x_desired = pose.position.x
         y_desired = pose.position.y
@@ -153,6 +164,26 @@ class BurgerUtility():
         else:
             return False
 
+    def move_to_pose_fail(self, state):
+
+        if state == actionlib.GoalStatus.ABORTED:
+            self.log("Goal aborted")
+            return True
+
+        elif state == actionlib.GoalStatus.LOST:
+            self.log("Burger lost goal")
+            return True
+
+        return False
+
+    def move_to_pose_succes(self, state):
+        state = self.burger.get_state()
+        if state == actionlib.GoalStatus.SUCCEEDED:
+            self.log("Burger found destination")
+            return True
+        else:
+            return False
+
     def move_to_pose_looking_for_qr_code(self, pose, next_x_y=None, stop_before_any=False):
         self.log("Move to pose looking for QR code")
         goal = self.goal_pose(pose)
@@ -162,16 +193,11 @@ class BurgerUtility():
         start = time.time()
         while True:
             state = self.burger.get_state()
-            if state == actionlib.GoalStatus.ABORTED:
-                self.log("Goal aborted")
+            if self.move_to_pose_fail(state):
                 return False
 
-            elif state == actionlib.GoalStatus.LOST:
-                self.log("Burger lost goal")
-                return False
-
-            elif state == actionlib.GoalStatus.SUCCEEDED:
-                self.log("Burger found destination but did not find QR")
+            elif self.move_to_pose_succes(state):
+                self.log("Did not find QR code")
                 return False
 
             elif stop_before_any and self.check_if_qr_code(new=True, stop=True):

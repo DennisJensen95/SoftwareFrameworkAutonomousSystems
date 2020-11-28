@@ -48,7 +48,7 @@ class MissionPlanning():
         qr_code_pos.pose.orientation = self.burger.saved_robot_pos.pose.pose.orientation
 
         goal_pose = self.burger.get_goal_pose(qr_code_pos)
-        if self.burger.move_to_pose(goal_pose, rospy.Duration()):
+        if self.burger.move_to_pose(goal_pose):
             self.log("Succesfull moved to target position")
             if self.qr_code_util.qr_code_detected:
                 self.qr_code_util.save_code_message(qr_code_pos.pose.position)
@@ -118,6 +118,7 @@ class MissionPlanning():
         return qr_code_pos_odom.pose.position
 
     def save_qr_code_message(self, qr_code_position):
+        self.log("Trying to save QR code message with qr code position")
         self.qr_code_util.save_code_message(qr_code_position)
 
     def get_heading_quadrant(self, angle):
@@ -138,7 +139,8 @@ class MissionPlanning():
         return (np.random.choice([1, -1]), np.random.choice([1, -1]))
 
     def drive_around_qr_code(self, qr_code_position, next_x_y):
-        self.log("Drive around qr code")
+        self.log("Look for QR code hidden_frame: " + str(next_x_y) + "Odometry frame: (" + str(
+            qr_code_position.position.x) + "," + str(qr_code_position.position.y) + ")")
         (x_robot, y_robot, _) = self.burger.get_robot_x_y_position()
         x_qr = qr_code_position.position.x
         y_qr = qr_code_position.position.y
