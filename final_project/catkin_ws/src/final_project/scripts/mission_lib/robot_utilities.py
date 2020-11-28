@@ -327,7 +327,7 @@ class BurgerUtility():
             return True
 
     def find_qr_code_turn_around(self, new=True, next_x_y=None):
-        self.log("Searching for QR code")
+        self.log("Searching for QR code while 360 degrees turn")
         (_, _, start_angle) = self.transform.convert_orientation_to_euler(
             self.robot_imu_pos.orientation)
         accumulated_turn = 0
@@ -363,6 +363,9 @@ class BurgerUtility():
     def drive_patrol(self):
         patrol_points = [[-4.6, 1.1], [-6.0, 0.28],
                          [-4.8, -2.2], [0.9, 0.6], [4.7, 1.1], [5.6, -2.0]]
+
+        self.log("Drive to predefined point: " +
+                 str(patrol_points[self.next_target]))
 
         patrol_point_pose = self.patrol_point(patrol_points[self.next_target])
 

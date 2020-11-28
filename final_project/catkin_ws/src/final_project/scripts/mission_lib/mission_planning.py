@@ -3,6 +3,7 @@ import math
 import rospy
 from geometry_msgs.msg import PoseStamped, Pose
 import numpy as np
+import time
 
 
 class MissionPlanning():
@@ -38,8 +39,17 @@ class MissionPlanning():
         Returns:
             [type]: [description]
         """
+        self.log("Trying to drive to QR code")
+        if not self.qr_code_util.is_qr_code_detected():
+            self.log("Did not see a QR code")
+            return False
+
+        self.log("There is a QR code drive to it")
         qr_code_pos = self.transform.transform_qr_code_to_desired_pos(
             qr_code_pos, self.burger.robot_imu_pos, dist_from=dist_from)
+
+        qr_code_pos_estimated = self.transform.transform_qr_code_to_desired_pos(
+            qr_code_pos, self.burger.robot_imu_pos, dist_from=0)
 
         if isinstance(qr_code_pos, bool):
             return False
@@ -47,14 +57,16 @@ class MissionPlanning():
         # Turn to original orientation when detected qr code
         qr_code_pos.pose.orientation = self.burger.saved_robot_pos.pose.pose.orientation
 
+        # Will be overwritten when moving closer to QR
+        self.save_qr_code_message(qr_code_pos_estimated.pose.position)
+
         goal_pose = self.burger.get_goal_pose(qr_code_pos)
         if self.burger.move_to_pose(goal_pose):
             self.log("Succesfull moved to target position")
-            if self.qr_code_util.qr_code_detected:
-                self.qr_code_util.save_code_message(qr_code_pos.pose.position)
+            if self.qr_code_util.is_qr_code_detected():
+                self.save_qr_code_message(qr_code_pos_estimated.pose.position)
                 return True
 
-        self.log("Did not move to goal position")
         return False
 
     def check_if_qr_code(self, new):
@@ -84,6 +96,7 @@ class MissionPlanning():
         Returns:
             [type]: [description]
         """
+        self.log("Trying to find QR code")
         found_qr_code = False
         while not rospy.is_shutdown():
             found_qr_code = self.burger.drive_patrol()
@@ -97,14 +110,17 @@ class MissionPlanning():
         if qr_code_pos == None:
             return False
 
-        self.drive_to_qr_code(qr_code_pos)
+        if not self.drive_to_qr_code(qr_code_pos):
+            return False
 
         return found_qr_code
 
     def find_qr_code_turn_around(self, new=True):
+        self.log("Trying to find QR code turning 360")
         self.burger.find_qr_code_turn_around(new)
 
     def get_qr_code_position_in_odom_frame(self):
+        self.log("Get QR code in odometry position")
         qr_code_pos = self.burger.read_qr_code(duration=1)
 
         # Transform the QR code position from /map to /odometry and in global /odemtry frame
@@ -113,6 +129,7 @@ class MissionPlanning():
 
         # Save the code message
         if isinstance(qr_code_pos_odom, bool) or qr_code_pos_odom == None:
+            self.log("Failed getting QR code in odemtry position")
             return False
 
         return qr_code_pos_odom.pose.position
@@ -139,7 +156,7 @@ class MissionPlanning():
         return (np.random.choice([1, -1]), np.random.choice([1, -1]))
 
     def drive_around_qr_code(self, qr_code_position, next_x_y):
-        self.log("Look for QR code hidden_frame: " + str(next_x_y) + "Odometry frame: (" + str(
+        self.log("Look for QR code hidden_frame: " + str(next_x_y) + " Odometry frame: (" + str(
             qr_code_position.position.x) + "," + str(qr_code_position.position.y) + ")")
         (x_robot, y_robot, _) = self.burger.get_robot_x_y_position()
         x_qr = qr_code_position.position.x
@@ -150,7 +167,9 @@ class MissionPlanning():
         self.log("Angle to QR code is: " + str(angle))
 
         placement_x_y = self.get_heading_quadrant(angle)
-        dist_to_qr = 1.5
+
+        dist_to_qr = np.random.uniform(1.25, 2.75)
+
         points_diff = [[dist_to_qr, 0], [0, dist_to_qr]]
 
         point_x_1 = qr_code_position.position.x + \
@@ -159,11 +178,22 @@ class MissionPlanning():
             placement_x_y[1] * points_diff[0][1]
 
         point_x_2 = qr_code_position.position.x + \
-            placement_x_y[0] * points_diff[1][0]
+            placement_x_y[0] * points_diff[0][0]
         point_y_2 = qr_code_position.position.y + \
+            placement_x_y[1] * points_diff[0][0] * 1/2
+
+        point_x_3 = qr_code_position.position.x + \
+            placement_x_y[0] * points_diff[1][1] * 1/2
+        point_y_3 = qr_code_position.position.y + \
             placement_x_y[1] * points_diff[1][1]
 
-        points = [[point_x_1, point_y_1], [point_x_2, point_y_2]]
+        point_x_4 = qr_code_position.position.x + \
+            placement_x_y[0] * points_diff[1][0]
+        point_y_4 = qr_code_position.position.y + \
+            placement_x_y[1] * points_diff[1][1]
+
+        points = [[point_x_1, point_y_1], [point_x_2, point_y_2],
+                  [point_x_3, point_y_3], [point_x_4, point_y_4]]
 
         go_to_pose = Pose()
         go_to_pose.position = qr_code_position.position
@@ -186,10 +216,10 @@ class MissionPlanning():
         return False
 
     def drive_to_next_qr_code(self, next_x_y):
-        self.log("Drive to next qr code")
         """[summary]
         Drive to the next QR code from the last 
         """
+        self.log("Drive to next qr code")
         check_pos = PoseStamped()
         check_pos.header.frame_id = "hidden_frame"
         check_pos.pose.position.x = next_x_y[0]
@@ -204,7 +234,8 @@ class MissionPlanning():
         if self.drive_around_qr_code(desired_pose, next_x_y):
             self.burger.orient_to_saved_robot_pos()
             qr_code_pos = self.burger.read_qr_code(duration=1)
-            self.drive_to_qr_code(qr_code_pos)
+            if not self.drive_to_qr_code(qr_code_pos):
+                return False
             return True
 
         return False

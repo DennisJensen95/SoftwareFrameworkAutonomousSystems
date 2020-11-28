@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from numpy.lib.arraysetops import isin
 import rospy
 from tf.transformations import quaternion_from_matrix
 import tf
@@ -97,8 +98,10 @@ class FrameUtilities():
 
             if (self.qr_code_util.get_number_of_qr_codes() >= 2):
                 if self.qr_code_util.is_qr_codes_data_updated():
-                    self.create_transform_from_odom_to_hidden_frame()
+                    if not self.create_transform_from_odom_to_hidden_frame():
+                        continue
                     self.qr_code_util.set_updated_qr_codes(False)
+
                 rotation = self.pose_diff_hidden_frame_to_odom.orientation
                 rot_tuple = (rotation.x, rotation.y, rotation.z, rotation.w)
                 translation = self.pose_diff_hidden_frame_to_odom.position
@@ -132,6 +135,11 @@ class FrameUtilities():
         A = np.transpose(np.array(A))
         B = np.transpose(np.array(B))
         (R, t) = self.rigid_transform_3D(A, B)
+
+        if isinstance(R, bool):
+            self.qr_code_util.reset_qr_codes()
+            return False
+
         R = np.array(R)
         R = np.append(R, np.array([[0, 0, 0]]), axis=0)
         R = np.append(R, np.array([[0], [0], [0], [1]]), axis=1)
@@ -146,6 +154,8 @@ class FrameUtilities():
         self.pose_diff_hidden_frame_to_odom.orientation.y = quaternion_change[1]
         self.pose_diff_hidden_frame_to_odom.orientation.z = quaternion_change[2]
         self.pose_diff_hidden_frame_to_odom.orientation.w = quaternion_change[3]
+
+        return True
 
     def switch_camera_optical_link_to_base_footprint(self, pose_stamp, robot_imu_pose):
         pose_stamp.header.frame_id = "/base_footprint"
@@ -251,10 +261,9 @@ class FrameUtilities():
 
         # special reflection case
         if np.linalg.det(R) < 0:
-            print("det(R) < R, reflection detected!, correcting for it ...")
-            Vt[2, :] *= -1
-            R = np.matmul(Vt.T, U.T)
+            print("det(R) < R, reflection detected!, restart finding qr codes ...")
+            return (False, False)
 
         t = np.matmul(-R, centroid_A) + centroid_B
 
-        return R, t
+        return (R, t)

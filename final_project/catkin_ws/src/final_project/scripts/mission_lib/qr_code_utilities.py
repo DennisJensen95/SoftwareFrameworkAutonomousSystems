@@ -4,6 +4,7 @@ from std_msgs.msg import String
 from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
 import re
 import numpy as np
+import time
 
 
 class QrCodeUtility():
@@ -200,7 +201,14 @@ class QrCodeUtility():
         Returns:
             [bool]: [State detection]
         """
-        return self.qr_code_detected
+        timeout = 2
+        start = time.time()
+        while True:
+            if self.qr_code_detected:
+                return True
+
+            if (time.time() - start >= timeout):
+                return False
 
     def save_qr_code_position(self):
         """[summary]
@@ -217,6 +225,10 @@ class QrCodeUtility():
             key = str(i+1)
             if key in self.qr_messages_position:
                 self.log(self.qr_messages_position[key])
+
+    def reset_qr_codes(self):
+        self.log("Resetting QR codes")
+        self.qr_messages_position = {}
 
     def print_saved_word(self):
         word = ""
