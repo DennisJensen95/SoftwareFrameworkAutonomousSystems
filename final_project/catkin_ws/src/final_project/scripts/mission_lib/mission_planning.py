@@ -2,6 +2,7 @@
 import math
 import rospy
 from geometry_msgs.msg import PoseStamped, Pose
+import numpy as np
 
 
 class MissionPlanning():
@@ -133,7 +134,8 @@ class MissionPlanning():
         elif angle >= -math.pi/2 and angle < -math.pi:
             return (1, 1)
 
-        return (0, 0)
+        # Random choice
+        return (np.random.choice([1, -1]), np.random.choice([1, -1]))
 
     def drive_around_qr_code(self, qr_code_position, next_x_y):
         self.log("Drive around qr code")
@@ -142,6 +144,9 @@ class MissionPlanning():
         y_qr = qr_code_position.position.y
 
         angle = math.atan2(y_qr - y_robot, x_qr - x_robot)
+
+        self.log("Angle to QR code is: " + str(angle))
+
         placement_x_y = self.get_heading_quadrant(angle)
         dist_to_qr = 1.5
         points_diff = [[dist_to_qr, 0], [0, dist_to_qr]]

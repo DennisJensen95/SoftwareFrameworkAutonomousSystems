@@ -238,7 +238,6 @@ class BurgerUtility():
         self.cmd_vel_pub.publish(twist)
 
     def stop_moving(self):
-        self.log("Stop moving")
         self.burger.cancel_all_goals()
         twist = Twist()
         twist.linear.x = 0
