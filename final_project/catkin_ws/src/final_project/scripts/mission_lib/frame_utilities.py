@@ -186,8 +186,6 @@ class FrameUtilities():
         Returns:
             [bool]: [Success]
         """
-        self.log("Distance to QR code: " + str(qr_code_pos.pose.position.z))
-
         qr_code_pos = self.switch_camera_optical_link_to_base_footprint(
             qr_code_pos, robot_imu_pose)
 
@@ -206,12 +204,14 @@ class FrameUtilities():
         (_, _, yaw) = self.convert_orientation_to_euler(
             qr_code_pos.pose.orientation)
 
+        qr_code_position_odemetry = desired_pose
+
         desired_pose.pose.position.x = desired_pose.pose.position.x - \
             math.cos(yaw)*dist_from
         desired_pose.pose.position.y = desired_pose.pose.position.y - \
             math.sin(yaw)*dist_from
 
-        return desired_pose
+        return (qr_code_position_odemetry, desired_pose)
 
     def rigid_transform_3D(self, A, B):
         """[summary]

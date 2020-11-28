@@ -135,6 +135,7 @@ class BurgerUtility():
         Returns:
             [Bool]: [Success]
         """
+        self.log("Move to pose")
         goal = self.goal_pose(pose, frame=frame)
         self.burger.send_goal(goal)
         start = time.time()
@@ -158,6 +159,7 @@ class BurgerUtility():
         y_pos_state = (y_desired + self.margin_error_pos >=
                        y_reported and y_desired - self.margin_error_pos <= y_reported)
 
+        self.log("Got to position")
         # Check if the desired position was aquired
         if x_pos_state and y_pos_state:
             return True
@@ -177,7 +179,6 @@ class BurgerUtility():
         return False
 
     def move_to_pose_succes(self, state):
-        state = self.burger.get_state()
         if state == actionlib.GoalStatus.SUCCEEDED:
             self.log("Burger found destination")
             return True

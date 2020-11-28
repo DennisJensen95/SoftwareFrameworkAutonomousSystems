@@ -91,8 +91,12 @@ class QrCodeUtility():
             data_object = self.qr_codes_data_object(
                 N, L, current_qr, next_qr, qr_code_pos_odom)
             self.qr_messages_position.update(data_object)
+            self.log("Saved QR code position")
 
             return True
+        else:
+            self.log(
+                "Did not save code message because covariance of QR code was too high")
 
         return False
 

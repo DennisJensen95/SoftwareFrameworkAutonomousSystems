@@ -45,11 +45,9 @@ class MissionPlanning():
             return False
 
         self.log("There is a QR code drive to it")
-        qr_code_pos = self.transform.transform_qr_code_to_desired_pos(
-            qr_code_pos, self.burger.robot_imu_pos, dist_from=dist_from)
 
-        qr_code_pos_estimated = self.transform.transform_qr_code_to_desired_pos(
-            qr_code_pos, self.burger.robot_imu_pos, dist_from=0)
+        (qr_code_pos, odemetry_desired_pos) = self.transform.transform_qr_code_to_desired_pos(
+            qr_code_pos, self.burger.robot_imu_pos, dist_from=dist_from)
 
         if isinstance(qr_code_pos, bool):
             return False
@@ -58,15 +56,16 @@ class MissionPlanning():
         qr_code_pos.pose.orientation = self.burger.saved_robot_pos.pose.pose.orientation
 
         # Will be overwritten when moving closer to QR
-        self.save_qr_code_message(qr_code_pos_estimated.pose.position)
 
-        goal_pose = self.burger.get_goal_pose(qr_code_pos)
+        self.save_qr_code_message(qr_code_pos.pose.position)
+        goal_pose = self.burger.get_goal_pose(odemetry_desired_pos)
         if self.burger.move_to_pose(goal_pose):
             self.log("Succesfull moved to target position")
             if self.qr_code_util.is_qr_code_detected():
-                self.save_qr_code_message(qr_code_pos_estimated.pose.position)
+                self.save_qr_code_message(qr_code_pos.pose.position)
+                self.log("Driving to QR code returned True")
                 return True
-
+        self.log("Driving to QR code return False")
         return False
 
     def check_if_qr_code(self, new):
@@ -124,7 +123,7 @@ class MissionPlanning():
         qr_code_pos = self.burger.read_qr_code(duration=1)
 
         # Transform the QR code position from /map to /odometry and in global /odemtry frame
-        qr_code_pos_odom = self.transform.transform_qr_code_to_desired_pos(
+        (qr_code_pos_odom, _) = self.transform.transform_qr_code_to_desired_pos(
             qr_code_pos, self.burger.robot_imu_pos, dist_from=0)
 
         # Save the code message
@@ -163,8 +162,6 @@ class MissionPlanning():
         y_qr = qr_code_position.position.y
 
         angle = math.atan2(y_qr - y_robot, x_qr - x_robot)
-
-        self.log("Angle to QR code is: " + str(angle))
 
         placement_x_y = self.get_heading_quadrant(angle)
 
