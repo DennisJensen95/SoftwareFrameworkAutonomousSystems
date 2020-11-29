@@ -33,6 +33,9 @@ class FrameUtilities():
             target=self.broadcast_transform_hidden_to_odom)
         self.hidden_frame_tf_thread.start()
 
+        # Transform init
+        self.transform_found = False
+
         # Except hook
         sys.excepthook = self.kill_thread_except_hook
 
@@ -98,7 +101,8 @@ class FrameUtilities():
 
             if (self.qr_code_util.get_number_of_qr_codes() >= 2):
                 if self.qr_code_util.is_qr_codes_data_updated():
-                    if not self.create_transform_from_odom_to_hidden_frame():
+                    self.create_transform_from_odom_to_hidden_frame()
+                    if not self.transform_found:
                         continue
                     self.qr_code_util.set_updated_qr_codes(False)
 
@@ -265,5 +269,8 @@ class FrameUtilities():
             return (False, False)
 
         t = np.matmul(-R, centroid_A) + centroid_B
+
+        if not self.transform_found:
+            self.transform_found = True
 
         return (R, t)
