@@ -1,5 +1,5 @@
 Results:
-layout 1: 1/1
+layout 1: 1/2
 layout 2: 2/2
 layout 3: 2/3
-layout 4: 1/1
+layout 4: 2/2

@@ -17,7 +17,7 @@ def read_and_save_qr_code(mission_planning):
     return True
 
 
-def mission_part_one(mission_planning, burger, qr_code_util):
+def mission_part_one(mission_planning, qr_code_util, frame_util):
     """[summary]
     Find and locate the two first QR codes
     """
@@ -34,15 +34,14 @@ def mission_part_one(mission_planning, burger, qr_code_util):
         qr_code_util.print_saved_qr_codes()
 
         # Make sure hidden frame has time for computation
-        rospy.sleep(10)
-        if qr_code_util.get_number_of_qr_codes() >= 2:
+        if qr_code_util.get_number_of_qr_codes() >= 2 and frame_util.transform_found:
             break
 
         if found_qr_code:
             mission_planning.find_qr_code_turn_around(new=True)
 
 
-def mission_part_two(mission_planning, burger, qr_code_util):
+def mission_part_two(mission_planning, qr_code_util):
     log("\n\nStarting Mission 2 \n\n")
     while qr_code_util.get_number_of_qr_codes() < 5:
         known_qr_codes = qr_code_util.qr_messages_position
@@ -78,9 +77,9 @@ def main():
     burger = BurgerUtility(qr_code_util, frame_util)
     mission_planning = MissionPlanning(burger, qr_code_util, frame_util)
 
-    mission_part_one(mission_planning, burger, qr_code_util)
+    mission_part_one(mission_planning, qr_code_util, frame_util)
 
-    mission_part_two(mission_planning, burger, qr_code_util)
+    mission_part_two(mission_planning, qr_code_util)
 
     log("\n\nFound all QR codes \n\n")
     qr_code_util.print_saved_word()

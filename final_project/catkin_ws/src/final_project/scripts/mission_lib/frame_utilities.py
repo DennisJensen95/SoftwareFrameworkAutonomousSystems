@@ -141,7 +141,9 @@ class FrameUtilities():
         (R, t) = self.rigid_transform_3D(A, B)
 
         if isinstance(R, bool):
-            self.qr_code_util.reset_qr_codes()
+            if not self.transform_found:
+                self.qr_code_util.reset_qr_codes()
+
             return False
 
         R = np.array(R)
