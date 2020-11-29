@@ -169,9 +169,9 @@ class MissionPlanning():
 
         points_diff = [[dist_to_qr, 0], [0, dist_to_qr]]
 
-        point_x_1 = qr_code_position.position.x + \
+        point_x_4 = qr_code_position.position.x + \
             placement_x_y[0] * points_diff[0][0]
-        point_y_1 = qr_code_position.position.y + \
+        point_y_4 = qr_code_position.position.y + \
             placement_x_y[1] * points_diff[0][1]
 
         point_x_2 = qr_code_position.position.x + \
@@ -184,9 +184,9 @@ class MissionPlanning():
         point_y_3 = qr_code_position.position.y + \
             placement_x_y[1] * points_diff[1][1]
 
-        point_x_4 = qr_code_position.position.x + \
+        point_x_1 = qr_code_position.position.x + \
             placement_x_y[0] * points_diff[1][0]
-        point_y_4 = qr_code_position.position.y + \
+        point_y_1 = qr_code_position.position.y + \
             placement_x_y[1] * points_diff[1][1]
 
         points = [[point_x_1, point_y_1], [point_x_2, point_y_2],
